@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#081522">
+  <meta name="theme-color" content="#f5f0e7">
   <title>夜讀・閱覽室座位預約</title>
   <meta name="description" content="夜讀圖書館閱覽室座位預約系統，提供北側、南側與 2 樓閱覽室座位狀態即時檢視、時段預約、個人預約管理與館員管理功能。">
   <meta property="og:title" content="夜讀・閱覽室座位預約">
@@ -32,10 +32,10 @@
     </section>
 
     <section id="booking-view" class="view">
-      <div class="controls panel">
-        <label>閱覽室<select id="room-select"><option value="north">北側閱覽室</option><option value="south">南側閱覽室</option><option value="floor2">2 樓閱覽區</option></select></label>
-        <label>預約日期<input id="date-select" type="date"></label>
-        <label>開始時段<select id="slot-select"></select></label>
+      <div class="controls panel booking-steps" aria-label="預約步驟">
+        <div class="control-step"><span class="step-number">01</span><label>先選日期<input id="date-select" type="date" aria-label="預約日期"></label></div>
+        <div class="control-step"><span class="step-number">02</span><label>再選時段<select id="slot-select" aria-label="開始時段"></select></label></div>
+        <div class="control-step"><span class="step-number">03</span><label>最後選館室<select id="room-select" aria-label="閱覽室"><option value="north">北側閱覽室</option><option value="south">南側閱覽室</option><option value="floor2">2 樓閱覽區</option></select></label></div>
         <label class="filter-toggle"><input id="bookable-only" type="checkbox" disabled><span>只看可預約</span></label>
         <div class="availability-note"><span class="live-dot"></span><span id="availability-count">載入座位中…</span></div>
       </div>
