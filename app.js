@@ -59,7 +59,7 @@
     try{
       const [{data:seats,error:sErr},{data:booked,error:bErr},{data:blocked,error:kErr}]=await Promise.all([
         sb.from("seats").select("id,seat_no,is_active").eq("room_code",room).order("seat_no"),
-        sb.from("reservations").select("seat_id").eq("room_code",room).eq("reservation_date",date).eq("start_time",time+":00").eq("status","confirmed"),
+        sb.rpc("get_booked_seat_ids",{p_room_code:room,p_date:date,p_start_time:time+":00"}),
         sb.from("blocked_slots").select("id").eq("room_code",room).eq("reservation_date",date).eq("start_time",time+":00")
       ]);
       if(sErr||bErr||kErr)throw sErr||bErr||kErr;
