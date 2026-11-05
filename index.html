@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#081522">
+  <title>夜讀・閱覽室座位預約</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="grain"></div>
+  <header class="topbar">
+    <a class="brand" href="#"><span class="brand-mark">N</span><span>夜讀 <small>LIBRARY / SEAT RESERVATION</small></span></a>
+    <nav><button class="nav-link active" data-view="booking">座位預約</button><button class="nav-link" data-view="mine">我的預約</button><button class="nav-link admin-only hidden" data-view="admin">館員管理</button></nav>
+    <div class="account"><span id="user-label">訪客模式</span><button id="auth-open" class="text-button">登入 / 註冊 ↗</button><button id="logout" class="text-button hidden">登出</button></div>
+  </header>
+
+  <main>
+    <section class="intro">
+      <div class="eyebrow"><span class="live-dot"></span> OPEN DAILY · 09:00—21:00</div>
+      <div class="intro-row"><div><h1>為安靜，<em>留一個位置。</em></h1><p>在光線與書頁之間，找到今天的專注座標。</p></div><div class="date-stamp"><span>TAIPEI TIME</span><strong id="today-label">----</strong><small>GMT+8 · Asia/Taipei</small></div></div>
+    </section>
+
+    <section id="booking-view" class="view">
+      <div class="controls panel">
+        <label>閱覽室<select id="room-select"><option value="north">北側閱覽室</option><option value="south">南側閱覽室</option></select></label>
+        <label>預約日期<input id="date-select" type="date"></label>
+        <label>開始時段<select id="slot-select"></select></label>
+        <div class="availability-note"><span class="live-dot"></span><span id="availability-count">載入座位中…</span></div>
+      </div>
+      <div class="workspace">
+        <section class="map-panel panel">
+          <div class="section-heading"><div><span class="eyebrow">FLOOR PLAN / 01</span><h2>座位配置</h2></div><span class="floor-tag">LEVEL 2 · 靜讀區</span></div>
+          <div class="legend">
+            <span><i class="key available"></i>空位</span><span><i class="key booked"></i>已預約</span><span><i class="key disabled"></i>停用</span><span><i class="key selected"></i>已選取</span>
+          </div>
+          <div class="floorplan-wrap"><div class="floorplan" id="floorplan"><div class="loading">正在讀取座位資料…</div></div></div>
+          <div class="map-foot"><span>請選擇一個空位</span><span>座位總數 <b>12</b> / 間</span></div>
+        </section>
+        <aside class="summary panel" id="summary">
+          <span class="eyebrow">YOUR SELECTION</span><h2>預約摘要</h2>
+          <div class="summary-seat"><span>選取座位</span><strong id="sum-seat">尚未選位</strong></div>
+          <dl><div><dt>閱覽室</dt><dd id="sum-room">北側閱覽室</dd></div><div><dt>日期</dt><dd id="sum-date">—</dd></div><div><dt>時段</dt><dd id="sum-slot">—</dd></div></dl>
+          <p class="hint" id="summary-hint">選擇地圖上的空位，確認後完成預約。</p>
+          <button id="confirm-booking" class="primary-button" disabled>確認預約 <span>↗</span></button>
+          <small class="fineprint">每次可預約一個座位 · 每段一小時</small>
+        </aside>
+      </div>
+    </section>
+
+    <section id="mine-view" class="view hidden">
+      <div class="page-heading"><span class="eyebrow">PERSONAL / 02</span><h2>我的預約</h2><p>管理你的閱讀時段，讓每一次到館都有準備。</p></div>
+      <div id="my-reservations" class="reservation-list panel"><div class="empty">登入後即可查看自己的預約。</div></div>
+    </section>
+
+    <section id="admin-view" class="view hidden">
+      <div class="page-heading"><span class="eyebrow">LIBRARIAN / 03</span><h2>館員管理</h2><p>檢視預約、管理座位狀態與封鎖時段。</p></div>
+      <div class="admin-grid">
+        <section class="panel admin-card"><h3>停用 / 啟用座位</h3><label>閱覽室<select id="admin-room"><option value="north">北側閱覽室</option><option value="south">南側閱覽室</option></select></label><label>座位<select id="admin-seat"></select></label><button id="toggle-seat" class="secondary-button">切換座位狀態</button></section>
+        <section class="panel admin-card"><h3>封鎖時段</h3><label>閱覽室<select id="block-room"><option value="north">北側閱覽室</option><option value="south">南側閱覽室</option></select></label><label>日期<input id="block-date" type="date"></label><label>時段<select id="block-slot"></select></label><label>原因<input id="block-reason" maxlength="120" placeholder="例：設備維護"></label><button id="block-submit" class="secondary-button">封鎖此時段</button></section>
+      </div>
+      <section class="panel admin-table"><div class="section-heading"><h3>近期預約</h3><button id="admin-refresh" class="text-button">重新整理 ↻</button></div><div id="all-reservations" class="table-wrap">載入中…</div></section>
+    </section>
+  </main>
+
+  <footer><span>夜讀・閱覽室</span><span>QUIET SPACE, CLEAR MIND.</span><span>© <span id="year"></span> LIBRARY</span></footer>
+
+  <div id="auth-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <div class="modal-card panel"><button class="modal-close" id="auth-close" aria-label="關閉">×</button><span class="eyebrow">MEMBER ACCESS</span><h2 id="auth-title">歡迎回到夜讀</h2><p class="modal-desc">使用教案測試學號登入，無需提供 Email。</p>
+      <div class="tabs"><button class="tab active" data-auth="login">登入</button><button class="tab" data-auth="register">建立帳號</button></div>
+      <form id="auth-form"><label>9 位數測試學號<input id="student-id" inputmode="numeric" pattern="[0-9]{9}" maxlength="9" placeholder="例：001123456" required></label><label>密碼<input id="password" type="password" minlength="8" autocomplete="current-password" placeholder="至少 8 個字元" required></label><button class="primary-button" id="auth-submit">登入 <span>↗</span></button></form>
+      <p class="fineprint">學號格式：前三碼 000–115，其餘六碼自訂。</p>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
