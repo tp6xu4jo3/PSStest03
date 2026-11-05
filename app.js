@@ -37,7 +37,7 @@
     const btn=$("auth-submit");setBusy(btn,true);
     try{
       if(currentAuth==="register"){
-        const {data,error}=await sb.functions.invoke("register-student",{body:{student_id:id,password:pw}});
+        const {data,error}=await sb.functions.invoke("account",{body:{student_id:id,password:pw}});
         if(error)throw error;if(data?.error)throw new Error(data.error);
         // 註冊函式建立已確認的 Supabase Auth 使用者，再以合成 Email 登入。
         const email=`${id}@students.library.invalid`;const {error:loginError}=await sb.auth.signInWithPassword({email,password:pw});if(loginError)throw loginError;
