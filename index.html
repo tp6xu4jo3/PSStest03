@@ -12,6 +12,9 @@
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="app.js"></script>
+  <meta property="og:image" content="https://bolt.new/static/og_default.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
 </head>
 <body>
   <div class="grain"></div>
@@ -32,6 +35,7 @@
         <label>閱覽室<select id="room-select"><option value="north">北側閱覽室</option><option value="south">南側閱覽室</option></select></label>
         <label>預約日期<input id="date-select" type="date"></label>
         <label>開始時段<select id="slot-select"></select></label>
+        <label class="filter-toggle"><input id="bookable-only" type="checkbox" disabled><span>只看可預約</span></label>
         <div class="availability-note"><span class="live-dot"></span><span id="availability-count">載入座位中…</span></div>
       </div>
       <div class="workspace">
@@ -41,6 +45,7 @@
             <span><i class="key available"></i>空位</span><span><i class="key booked"></i>已預約</span><span><i class="key disabled"></i>停用</span><span><i class="key selected"></i>已選取</span>
           </div>
           <div class="floorplan-wrap"><div class="floorplan" id="floorplan"><div class="loading">正在讀取座位資料…</div></div></div>
+          <div id="empty-state" class="empty-state hidden" role="status"><p id="empty-message"></p><button id="clear-filter" class="secondary-button" type="button">清除篩選</button></div>
           <div class="map-foot"><span>請選擇一個空位</span><span>座位總數 <b>12</b> / 間</span></div>
         </section>
         <aside class="summary panel" id="summary">

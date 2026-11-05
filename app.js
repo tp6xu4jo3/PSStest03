@@ -3,7 +3,14 @@
   const $ = (id) => document.getElementById(id);
   const rooms = { north: "北側閱覽室", south: "南側閱覽室" };
   const slots = Array.from({length:12},(_,i)=>`${String(i+9).padStart(2,"0")}:00`);
-  let sb, session=null, profile=null, selectedSeat=null, currentAuth="login", toastTimer;
+  const SEAT_LAYOUT = [
+    {no:1,col:1,row:1},{no:2,col:2,row:1},{no:3,col:3,row:1},
+    {no:4,col:1,row:3},{no:5,col:2,row:3},{no:6,col:3,row:3},
+    {no:7,col:5,row:1},{no:8,col:6,row:1},{no:9,col:7,row:1},
+    {no:10,col:5,row:3},{no:11,col:6,row:3},{no:12,col:7,row:3}
+  ];
+  const DESK_COLUMNS = [1,2,3,5,6,7];
+  let sb, session=null, profile=null, selectedSeat=null, seatView=null, currentAuth="login", toastTimer;
   const localDate = (d=new Date()) => new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(d);
   const shiftDate = (n) => { const [y,m,d]=localDate().split("-").map(Number); const x=new Date(Date.UTC(y,m-1,d+n)); return `${x.getUTCFullYear()}-${String(x.getUTCMonth()+1).padStart(2,"0")}-${String(x.getUTCDate()).padStart(2,"0")}`; };
   const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -14,9 +21,9 @@
     $("date-select").min=shiftDate(0);$("date-select").max=shiftDate(7);$("date-select").value=shiftDate(0);
     $("block-date").min=shiftDate(0);$("block-date").max=shiftDate(7);$("block-date").value=shiftDate(0);
     fillSlots();
-    $("slot-select").value="09:00";
     $("admin-seat").innerHTML=Array.from({length:12},(_,i)=>`<option value="${i+1}">座位 ${String(i+1).padStart(2,"0")}</option>`).join("");
     $("room-select").addEventListener("change",refreshSeats);$("date-select").addEventListener("change",()=>{selectedSeat=null;refreshSeats()});$("slot-select").addEventListener("change",()=>{selectedSeat=null;refreshSeats()});
+    $("bookable-only").onchange=renderMap;$("clear-filter").onclick=clearFilter;
     $("confirm-booking").addEventListener("click",book);$("auth-open").onclick=()=>openAuth();$("auth-close").onclick=()=> $("auth-modal").classList.add("hidden");$("logout").onclick=logout;
     document.querySelectorAll("[data-auth]").forEach(b=>b.onclick=()=>switchAuth(b.dataset.auth));
     document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>showView(b.dataset.view));
@@ -27,7 +34,7 @@
     sb.auth.onAuthStateChange((_event,s)=>{session=s;loadProfile().finally(()=>{updateAccount();refreshSeats()})});
     refreshSeats();
   }
-  function fillSlots(){const html=slots.map(s=>`<option value="${s}">${s}–${String(Number(s.slice(0,2))+1).padStart(2,"0")}:00</option>`).join("");$("slot-select").innerHTML=html;$("block-slot").innerHTML=html}
+  function fillSlots(){const html=slots.map(s=>`<option value="${s}">${s}–${String(Number(s.slice(0,2))+1).padStart(2,"0")}:00</option>`).join("");$("slot-select").innerHTML='<option value="">請選擇時段</option>'+html;$("block-slot").innerHTML=html}
   async function loadProfile(){profile=null;if(session){const {data,error}=await sb.from("profiles").select("student_id,role").eq("id",session.user.id).maybeSingle();if(!error)profile=data}updateAccount()}
   function updateAccount(){$("user-label").textContent=profile?`${profile.student_id} · ${profile.role==="librarian"?"館員":"學生"}`:"訪客模式";$("auth-open").classList.toggle("hidden",!!session);$("logout").classList.toggle("hidden",!session);document.querySelectorAll(".admin-only").forEach(x=>x.classList.toggle("hidden",profile?.role!=="librarian"))}
   function openAuth(){if(!sb){notify("請先完成 Supabase 設定。");return}$("auth-modal").classList.remove("hidden")}
@@ -52,9 +59,11 @@
   async function logout(){await sb.auth.signOut();selectedSeat=null;notify("已登出。");showView("booking")}
   function showView(name){document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));$(`${name}-view`).classList.remove("hidden");document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="mine")loadMine();if(name==="admin"){if(profile?.role!=="librarian"){notify("此頁面僅限館員使用。");showView("booking");return}loadAdmin()}}
   async function refreshSeats(){
-    selectedSeat=null;updateSummary();
+    selectedSeat=null;seatView=null;updateSummary();
+    syncFilter();
     if(!sb)return;
     const room=$("room-select").value,date=$("date-select").value,time=$("slot-select").value;
+    if(!date||!time){$("floorplan").innerHTML='<div class="loading">請先選擇日期與時段，即可查看座位。</div>';$("availability-count").textContent="請選擇日期與時段";showEmpty("");return}
     $("floorplan").innerHTML='<div class="loading">正在讀取座位資料…</div>';
     try{
       const [{data:seats,error:sErr},{data:booked,error:bErr},{data:blocked,error:kErr}]=await Promise.all([
@@ -63,31 +72,55 @@
         sb.from("blocked_slots").select("id").eq("room_code",room).eq("reservation_date",date).eq("start_time",time+":00")
       ]);
       if(sErr||bErr||kErr)throw sErr||bErr||kErr;
-      const bookedSet=new Set((booked||[]).map(x=>x.seat_id)),isBlocked=(blocked||[]).length>0;
-      renderSeats(seats||[],bookedSet,isBlocked);
-      const available=(seats||[]).filter(s=>s.is_active&&!bookedSet.has(s.id)).length;
-      $("availability-count").textContent=isBlocked?"此時段已封鎖":`目前 ${available} / 12 個空位`;
-      if(!available&&!isBlocked)$("summary-hint").textContent="此時段已無空位，請改選其他時段。";
-    }catch(e){console.error(e);$("floorplan").innerHTML='<div class="empty">座位資料載入失敗，請確認網路或重新整理。</div>';notify("無法取得座位資料。")}
+      seatView={seats:seats||[],bookedSet:new Set((booked||[]).map(x=>x.seat_id)),isBlocked:(blocked||[]).length>0};
+      renderMap();
+      updateSummary();
+    }catch(e){console.error(e);seatView=null;$("floorplan").innerHTML='<div class="empty">座位資料載入失敗，請確認網路或重新整理。</div>';$("availability-count").textContent="座位資料載入失敗";showEmpty("");notify("無法取得座位資料。")}
   }
-  function renderSeats(seats,bookedSet,isBlocked){
-    const map=$("floorplan");map.innerHTML="";
-    // 每列三座，中間留出主走道；共四列、十二席。
-    for(let row=0;row<4;row++){
-      for(let col=0;col<6;col++){
-        if(col===3){const aisle=document.createElement("div");aisle.className="aisle";aisle.textContent=row===1?"主走道 · AISLE":"·";map.appendChild(aisle)}
-        const n=row*3+(col<3?col+1:col-2),seat=seats.find(s=>s.seat_no===n);if(!seat)continue;
-        const booked=bookedSet.has(seat.id),disabled=!seat.is_active||isBlocked;
-        const b=document.createElement("button");b.type="button";b.className="seat";b.innerHTML=`<span>${String(n).padStart(2,"0")}</span><small>${disabled?"停用":booked?"已預約":"空位"}</small>`;
-        if(disabled)b.classList.add("disabled-seat");else if(booked)b.classList.add("booked");else if(selectedSeat===seat.id)b.classList.add("selected");
-        b.disabled=disabled||booked;
-        b.setAttribute("aria-label",`座位 ${n}，${disabled?"停用":booked?"已預約":selectedSeat===seat.id?"已選取":"空位"}`);
-        b.onclick=()=>{if(!session){openAuth();notify("請先登入，再選擇座位。");return}selectedSeat=seat.id;renderSeats(seats,bookedSet,isBlocked);updateSummary()};
-        map.appendChild(b);
-      }
-    }
+  const isBookable=(seat,view)=>seat.is_active&&!view.bookedSet.has(seat.id)&&!view.isBlocked;
+  const bookableSeats=()=>seatView?seatView.seats.filter(s=>isBookable(s,seatView)):[];
+  function syncFilter(){const ready=!!$("date-select").value&&!!$("slot-select").value;$("bookable-only").disabled=!ready;if(!ready)$("bookable-only").checked=false}
+  function clearFilter(){$("bookable-only").checked=false;renderMap()}
+  function showEmpty(message){$("empty-state").classList.toggle("hidden",!message);$("empty-message").textContent=message}
+  function placeSeat(map,el,col,row){el.style.gridColumn=String(col);el.style.gridRow=String(row);map.appendChild(el)}
+  function renderMap(){
+    const map=$("floorplan");
+    if(!seatView){showEmpty("");return}
+    const {seats,bookedSet,isBlocked}=seatView;
+    if(!seats.length){map.innerHTML='<div class="empty">尚未建立此閱覽室的座位資料。</div>';$("availability-count").textContent="尚無座位資料";showEmpty("");return}
+    const bookableCount=bookableSeats().length,bookableOnly=$("bookable-only").checked;
+    $("availability-count").textContent=isBlocked?"此時段已封鎖":`目前可預約 ${bookableCount} / ${seats.length} 席`;
+    map.innerHTML="";
+    const aisle=document.createElement("div");aisle.className="aisle";aisle.textContent="主走道 · AISLE";map.appendChild(aisle);
+    DESK_COLUMNS.forEach(col=>placeSeat(map,Object.assign(document.createElement("div"),{className:"desk"}),col,2));
+    SEAT_LAYOUT.forEach(({no,col,row})=>{
+      const seat=seats.find(s=>s.seat_no===no);if(!seat)return;
+      const booked=bookedSet.has(seat.id),bookable=isBookable(seat,seatView),selected=selectedSeat===seat.id;
+      const unavailable=!seat.is_active||isBlocked;
+      const label=!seat.is_active?"停用":isBlocked?"封鎖":booked?"已預約":"空位";
+      const b=document.createElement("button");b.type="button";b.className="seat";
+      b.innerHTML=`<span>${String(no).padStart(2,"0")}</span><small>${label}</small>`;
+      if(unavailable)b.classList.add("disabled-seat");else if(booked)b.classList.add("booked");
+      if(selected)b.classList.add("selected");
+      b.classList.toggle("dimmed",bookableOnly&&!bookable);
+      b.disabled=!bookable;
+      b.setAttribute("aria-pressed",String(selected));
+      b.setAttribute("aria-label",`座位 ${no}，${selected?"已選取":label}`);
+      b.onclick=()=>{if(!session){openAuth();notify("請先登入，再選擇座位。");return}selectedSeat=seat.id;renderMap();updateSummary()};
+      placeSeat(map,b,col,row);
+    });
+    const entrance=document.createElement("div");entrance.className="entrance";entrance.textContent="入口 · ENTRANCE";map.appendChild(entrance);
+    showEmpty(bookableCount?"":isBlocked?"此時段已被館員封鎖，請換個時段。":"此時段已無可預約座位，請換個時段看看。");
   }
-  function updateSummary(){const room=$("room-select").value,date=$("date-select").value,time=$("slot-select").value;$("sum-seat").textContent=selectedSeat?`已選取`:"尚未選位";$("sum-room").textContent=rooms[room];$("sum-date").textContent=date||"—";$("sum-slot").textContent=time?`${time}–${String(Number(time.slice(0,2))+1).padStart(2,"0")}:00`:"—";$("confirm-booking").disabled=!selectedSeat||!session;$("summary-hint").textContent=!session?"登入後即可選位並完成預約。":selectedSeat?"確認資料無誤後送出預約。":"選擇地圖上的空位，確認後完成預約。"}
+  function updateSummary(){
+    const room=$("room-select").value,date=$("date-select").value,time=$("slot-select").value;
+    const seat=seatView&&selectedSeat?seatView.seats.find(s=>s.id===selectedSeat):null;
+    let hint="選擇地圖上的空位，確認後完成預約。";
+    if(!session)hint="登入後即可選位並完成預約。";
+    else if(seat)hint="確認資料無誤後送出預約。";
+    else if(seatView&&!bookableSeats().length)hint="此時段已無可預約座位，請換個時段。";
+    $("sum-seat").textContent=seat?`座位 ${String(seat.seat_no).padStart(2,"0")}`:"尚未選位";$("sum-room").textContent=rooms[room];$("sum-date").textContent=date||"—";$("sum-slot").textContent=time?`${time}–${String(Number(time.slice(0,2))+1).padStart(2,"0")}:00`:"—";$("confirm-booking").disabled=!seat||!session;$("summary-hint").textContent=hint;
+  }
   async function book(){if(!session||!selectedSeat){notify("請先登入並選擇空位。");return}const btn=$("confirm-booking");setBusy(btn,true);
     try{const {data,error}=await sb.rpc("book_seat",{p_seat_id:selectedSeat,p_date:$("date-select").value,p_start_time:$("slot-select").value+":00"});if(error)throw error;selectedSeat=null;notify("預約成功！已加入我的預約。");await refreshSeats()}
     catch(e){console.error(e);selectedSeat=null;notify(e.message?.includes("SLOT_TAKEN")?"手慢了一步，座位剛被預約，請重新選位。":e.message?.includes("SLOT_BLOCKED")?"此時段已被館員封鎖，請改選其他時段。":e.message?.includes("DATE_RANGE")?"只能預約今天至第 7 天的時段。":e.message?.includes("TIME_RANGE")?"開放預約時間為每日 09:00–21:00。":"預約失敗，請重新載入座位並再試一次。");await refreshSeats()}
