@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#081522">
   <title>夜讀・閱覽室座位預約</title>
+  <meta name="description" content="夜讀圖書館閱覽室座位預約系統，提供北側與南側閱覽室座位狀態即時檢視、時段預約、個人預約管理與館員管理功能。">
+  <meta property="og:title" content="夜讀・閱覽室座位預約">
+  <meta property="og:description" content="夜讀圖書館閱覽室座位預約系統，提供北側與南側閱覽室座位狀態即時檢視、時段預約、個人預約管理與館員管理功能。">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -12,9 +15,6 @@
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="app.js"></script>
-  <meta property="og:image" content="https://bolt.new/static/og_default.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
 </head>
 <body>
   <div class="grain"></div>
@@ -43,15 +43,17 @@
           <div class="section-heading"><div><span class="eyebrow">FLOOR PLAN / 01</span><h2>座位配置</h2></div><span class="floor-tag">LEVEL 2 · 靜讀區</span></div>
           <div class="legend">
             <span><i class="key available"></i>空位</span><span><i class="key booked"></i>已預約</span><span><i class="key disabled"></i>停用</span><span><i class="key selected"></i>已選取</span>
+            <span style="color:#395466;margin:0 4px">|</span>
+            <span style="color:var(--muted)">🪟 靠窗 · ⚡ 插座 · 🖥️ 獨立桌 · 🛋️ 沙發</span>
           </div>
           <div class="floorplan-wrap"><div class="floorplan" id="floorplan"><div class="loading">正在讀取座位資料…</div></div></div>
           <div id="empty-state" class="empty-state hidden" role="status"><p id="empty-message"></p><button id="clear-filter" class="secondary-button" type="button">清除篩選</button></div>
-          <div class="map-foot"><span>請選擇一個空位</span><span>座位總數 <b>12</b> / 間</span></div>
+          <div class="map-foot"><span>點選空位即可預約</span><span>閱覽室總席數 <b id="room-total-seats">24</b> 席</span></div>
         </section>
         <aside class="summary panel" id="summary">
           <span class="eyebrow">YOUR SELECTION</span><h2>預約摘要</h2>
-          <div class="summary-seat"><span>選取座位</span><strong id="sum-seat">尚未選位</strong></div>
-          <dl><div><dt>閱覽室</dt><dd id="sum-room">北側閱覽室</dd></div><div><dt>日期</dt><dd id="sum-date">—</dd></div><div><dt>時段</dt><dd id="sum-slot">—</dd></div></dl>
+          <div class="summary-seat"><span>選取座位</span><strong id="sum-seat">尚未選位</strong><div id="sum-features" class="summary-features"></div></div>
+          <dl><div><dt>閱覽室</dt><dd id="sum-room">北側閱覽室</dd></div><div><dt>分區配置</dt><dd id="sum-zone">—</dd></div><div><dt>日期</dt><dd id="sum-date">—</dd></div><div><dt>時段</dt><dd id="sum-slot">—</dd></div></dl>
           <p class="hint" id="summary-hint">選擇地圖上的空位，確認後完成預約。</p>
           <button id="confirm-booking" class="primary-button" disabled>確認預約 <span>↗</span></button>
           <small class="fineprint">每次可預約一個座位 · 每段一小時</small>

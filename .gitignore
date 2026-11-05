@@ -1,5 +1,9 @@
 node_modules/
-.env
+.env*
+package.json
+server.js
+metadata.json
+bun.lock
 vite.config.js.timestamp-*.mjs
 vite.config.mjs.timestamp-*.mjs
 vite.config.cjs.timestamp-*.mjs
