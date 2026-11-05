@@ -1,9 +1,9 @@
 (() => {
   const cfg = window.APP_CONFIG || {};
   const $ = (id) => document.getElementById(id);
-  const rooms = { north: "北側閱覽室", south: "南側閱覽室" };
+  const rooms = { north: "北側閱覽室", south: "南側閱覽室", floor2: "2 樓閱覽區" };
   const ALL_SLOTS = Array.from({ length: 12 }, (_, i) => `${String(i + 9).padStart(2, "0")}:00`);
-  const ROOM_TOTALS = { north: 24, south: 20 };
+  const ROOM_TOTALS = { north: 24, south: 20, floor2: 10 };
 
   // --- 座位建築分區與特色配置 ---
   const NORTH_SEATS_CONFIG = [
@@ -64,11 +64,18 @@
     { no: 20, zone: "休閒沙發區", tag: "沙發座 🛋️", features: ["休閒沙發", "立燈 💡"] }
   ];
 
+  const FLOOR2_SEATS_CONFIG = Array.from({ length: 10 }, (_, index) => {
+    const no = index + 1;
+    const zone = no <= 4 ? "窗邊閱讀桌" : no <= 8 ? "中央共讀桌" : "安靜角落";
+    return { no, zone, tag: "獨立座位", features: ["桌椅", "插座 ⚡"] };
+  });
+
   let sb, session = null, profile = null, selectedSeat = null, seatView = null;
   let currentAuth = "login", toastTimer, currentView = "booking";
   let currentQueryId = 0; // 查詢防競爭識別碼
   let realtimeChannel = null, pollingTimer = null, remoteDebounceTimer = null;
   let cachedReservations = [];
+  let adminLoadId = 0, filteredAdminReservations = [];
 
   // --- 台北時區處理 ---
   function getTaipeiDateTime() {
@@ -129,7 +136,9 @@
   }
 
   function getSeatConfig(room, seatNo) {
-    const list = room === "north" ? NORTH_SEATS_CONFIG : SOUTH_SEATS_CONFIG;
+    const list = room === "north" ? NORTH_SEATS_CONFIG
+      : room === "south" ? SOUTH_SEATS_CONFIG
+      : FLOOR2_SEATS_CONFIG;
     return list.find(s => s.no === seatNo) || { no: seatNo, zone: "一般座位", tag: "閱覽座", features: [] };
   }
 
@@ -148,6 +157,8 @@
 
     updateAdminSeatOptions();
     $("admin-room").addEventListener("change", updateAdminSeatOptions);
+    ["admin-filter-room", "admin-filter-date-from", "admin-filter-date-to", "admin-filter-status"]
+      .forEach(id => $(id).addEventListener("change", loadAdminReservations));
 
     $("room-select").addEventListener("change", () => {
       selectedSeat = null;
@@ -176,6 +187,8 @@
     document.querySelectorAll("[data-view]").forEach(b => b.onclick = () => showView(b.dataset.view));
     $("auth-form").onsubmit = authenticate;
     $("admin-refresh").onclick = loadAdmin;
+    $("blocked-refresh").onclick = loadBlockedSlots;
+    $("admin-export-csv").onclick = exportAdminCsv;
     $("toggle-seat").onclick = toggleSeat;
     $("block-submit").onclick = blockSlot;
 
@@ -329,9 +342,11 @@
     if (!candidateSlots.length) return null;
 
     // 取得該室總啟用席數
-    const { data: activeSeats } = await sb.from("seats").select("id").eq("room_code", room).eq("is_active", true);
+    const { data: activeSeats, error: seatError } = await sb.from("seats").select("id").eq("room_code", room).eq("is_active", true);
     if (queryId !== currentQueryId) return null;
-    const totalActive = (activeSeats || []).length || ROOM_TOTALS[room] || 24;
+    if (seatError) throw seatError;
+    const totalActive = (activeSeats || []).length;
+    if (!totalActive) return null;
 
     // 依序檢查最早有空位的時段
     for (const slot of candidateSlots) {
@@ -542,7 +557,7 @@
     $("empty-message").textContent = message;
   }
 
-  // --- 建築平面圖渲染 (北側 24 席 / 南側 20 席) ---
+  // --- 建築平面圖渲染 ---
   function renderMap() {
     const map = $("floorplan");
     if (!seatView) { showEmpty(""); return; }
@@ -568,7 +583,7 @@
     windowWall.innerHTML = `
       <div class="arch-window-label">
         <span class="window-glass-bar"></span>
-        <span>${room === "north" ? "北向大片景觀採光窗 · NATURAL LIGHT & MOUNTAIN VIEW" : "南向庭園綠意採光窗 · BOTANICAL GARDEN VIEW"}</span>
+        <span>${room === "north" ? "北向大片景觀採光窗 · NATURAL LIGHT & MOUNTAIN VIEW" : room === "south" ? "南向庭園綠意採光窗 · BOTANICAL GARDEN VIEW" : "二樓採光閱讀區 · LEVEL 2 READING AREA"}</span>
         <span class="window-glass-bar"></span>
       </div>
     `;
@@ -576,8 +591,10 @@
 
     if (room === "north") {
       renderNorthPlan(plan, seats, bookedSet, isBlocked, bookableOnly);
-    } else {
+    } else if (room === "south") {
       renderSouthPlan(plan, seats, bookedSet, isBlocked, bookableOnly);
+    } else {
+      renderFloor2Plan(plan, seats, bookedSet, isBlocked, bookableOnly);
     }
 
     map.appendChild(plan);
@@ -861,6 +878,58 @@
     plan.appendChild(botGrid);
   }
 
+  function renderFloor2Plan(plan, dbSeats, bookedSet, isBlocked, bookableOnly) {
+    const body = document.createElement("div");
+    body.className = "floor2-body";
+
+    const windowTables = document.createElement("section");
+    windowTables.className = "arch-zone floor2-table-group";
+    windowTables.innerHTML = `
+      <div class="zone-title"><span class="zone-badge">ZONE A</span><strong>窗邊長桌</strong><small>採光閱讀 · 4 席</small></div>
+      <div class="floor2-seat-grid floor2-four"></div>
+    `;
+    const windowGrid = windowTables.querySelector(".floor2-seat-grid");
+    for (let no = 1; no <= 4; no++) {
+      windowGrid.appendChild(createSeatButton(no, "floor2", dbSeats, bookedSet, isBlocked, bookableOnly));
+    }
+    body.appendChild(windowTables);
+
+    const aisle = document.createElement("div");
+    aisle.className = "arch-aisle floor2-walkway";
+    aisle.innerHTML = '<span class="aisle-line"></span><span class="aisle-text">中央走道 · WALKWAY</span><span class="aisle-line"></span>';
+    body.appendChild(aisle);
+
+    const centralTables = document.createElement("div");
+    centralTables.className = "floor2-central-tables";
+    [
+      { title: "中央共讀桌 A", start: 5, end: 7 },
+      { title: "中央共讀桌 B", start: 8, end: 10 }
+    ].forEach((table, index) => {
+      const group = document.createElement("section");
+      group.className = "arch-zone floor2-table-group";
+      group.innerHTML = `
+        <div class="zone-title"><span class="zone-badge">ZONE ${index === 0 ? "B" : "C"}</span><strong>${table.title}</strong><small>桌椅 · 插座 · ${table.end - table.start + 1} 席</small></div>
+        <div class="floor2-seat-grid"></div>
+      `;
+      const grid = group.querySelector(".floor2-seat-grid");
+      for (let no = table.start; no <= table.end; no++) {
+        grid.appendChild(createSeatButton(no, "floor2", dbSeats, bookedSet, isBlocked, bookableOnly));
+      }
+      centralTables.appendChild(group);
+    });
+    body.appendChild(centralTables);
+    plan.appendChild(body);
+
+    const entrance = document.createElement("div");
+    entrance.className = "arch-entrance";
+    entrance.innerHTML = `
+      <span class="entrance-icon">🚪</span>
+      <div class="entrance-info"><strong>2 樓閱覽區入口 · ENTRANCE</strong><small>由樓梯與電梯進入，請保持走道暢通</small></div>
+      <span class="entrance-arrow">➔</span>
+    `;
+    plan.appendChild(entrance);
+  }
+
   // --- 預約摘要面板更新 ---
   function updateSummary() {
     const room = $("room-select").value;
@@ -1075,34 +1144,89 @@
   // --- 館員管理 ---
   async function loadAdmin() {
     if (profile?.role !== "librarian") return;
-    $("all-reservations").textContent = "載入中…";
-    const { data, error } = await sb.from("reservations")
-      .select("reservation_date,start_time,room_code,status,student_id,seat_id,seats(seat_no)")
-      .order("reservation_date", { ascending: false })
-      .limit(100);
+    await Promise.all([loadAdminReservations(), loadBlockedSlots()]);
+  }
 
-    if (error) {
+  function getAdminFilters() {
+    return {
+      room: $("admin-filter-room").value,
+      dateFrom: $("admin-filter-date-from").value,
+      dateTo: $("admin-filter-date-to").value,
+      status: $("admin-filter-status").value
+    };
+  }
+
+  async function loadAdminReservations() {
+    if (profile?.role !== "librarian") return;
+    const requestId = ++adminLoadId;
+    const filters = getAdminFilters();
+    const exportButton = $("admin-export-csv");
+    $("all-reservations").textContent = "載入中…";
+    $("admin-result-count").textContent = "";
+    exportButton.disabled = true;
+
+    if (filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo) {
+      filteredAdminReservations = [];
+      $("all-reservations").innerHTML = '<div class="empty">起始日期不可晚於結束日期。</div>';
+      $("admin-result-count").textContent = "請調整日期範圍。";
+      exportButton.disabled = false;
+      return;
+    }
+
+    try {
+      const rows = [];
+      const pageSize = 1000;
+      let offset = 0;
+      while (true) {
+        let query = sb.from("reservations")
+          .select("reservation_date,start_time,room_code,status,student_id,seat_id,seats(seat_no)")
+          .order("reservation_date", { ascending: false })
+          .order("start_time", { ascending: true })
+          .order("seat_id", { ascending: true });
+        if (filters.room) query = query.eq("room_code", filters.room);
+        if (filters.dateFrom) query = query.gte("reservation_date", filters.dateFrom);
+        if (filters.dateTo) query = query.lte("reservation_date", filters.dateTo);
+        if (filters.status) query = query.eq("status", filters.status);
+
+        const { data, error } = await query.range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < pageSize) break;
+        offset += pageSize;
+      }
+      if (requestId !== adminLoadId || profile?.role !== "librarian") return;
+      filteredAdminReservations = rows;
+      renderAdminReservations(rows);
+    } catch (error) {
+      if (requestId !== adminLoadId) return;
+      console.error(error);
+      filteredAdminReservations = [];
       $("all-reservations").textContent = "讀取失敗，請確認館員權限。";
+      $("admin-result-count").textContent = "無法載入預約。";
+    } finally {
+      if (requestId === adminLoadId) exportButton.disabled = false;
+    }
+  }
+
+  function renderAdminReservations(rows) {
+    $("admin-result-count").textContent = `符合篩選條件：${rows.length} 筆`;
+    if (!rows.length) {
+      $("all-reservations").innerHTML = '<div class="empty">沒有符合目前篩選條件的預約。</div>';
       return;
     }
-    if (!data?.length) {
-      $("all-reservations").textContent = "目前沒有預約。";
-      return;
-    }
+    const statusNames = { confirmed: "已確認", cancelled: "已取消" };
     $("all-reservations").innerHTML = `
       <table>
-        <thead>
-          <tr><th>日期</th><th>時段</th><th>閱覽室</th><th>座位</th><th>學號</th><th>狀態</th></tr>
-        </thead>
+        <thead><tr><th>日期</th><th>時段</th><th>閱覽室</th><th>座位</th><th>學號</th><th>狀態</th></tr></thead>
         <tbody>
-          ${data.map(r => `
+          ${rows.map(r => `
             <tr>
               <td>${esc(r.reservation_date)}</td>
-              <td>${esc(r.start_time.slice(0, 5))}</td>
-              <td>${esc(rooms[r.room_code])}</td>
+              <td>${esc(r.start_time.slice(0, 5))}–${esc(window.AppUtils.endTime(r.start_time))}</td>
+              <td>${esc(rooms[r.room_code] || "閱覽室")}</td>
               <td>${String(r.seats?.seat_no || "").padStart(2, "0")}</td>
               <td>${esc(r.student_id || "")}</td>
-              <td>${esc(r.status)}</td>
+              <td>${esc(statusNames[r.status] || r.status)}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -1110,7 +1234,94 @@
     `;
   }
 
+  function exportAdminCsv() {
+    if (profile?.role !== "librarian") {
+      notify("此功能僅限館員使用。");
+      return;
+    }
+    if (!filteredAdminReservations.length) {
+      notify("目前篩選沒有預約可匯出。");
+      return;
+    }
+
+    const statusNames = { confirmed: "已確認", cancelled: "已取消" };
+    const headers = ["館室", "座號", "日期", "開始時間", "結束時間", "狀態"];
+    const rows = window.AppUtils.reservationCsvRows(filteredAdminReservations, rooms, statusNames);
+    const csv = `\ufeff${window.AppUtils.toCsv(headers, rows)}`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `閱覽室預約_${localDate()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    notify(`已匯出 ${rows.length} 筆符合篩選條件的預約。`);
+  }
+
+  async function loadBlockedSlots() {
+    if (profile?.role !== "librarian") return;
+    $("blocked-slots").textContent = "載入中…";
+    const { data, error } = await sb.from("blocked_slots")
+      .select("id,room_code,reservation_date,start_time,reason")
+      .order("reservation_date", { ascending: false })
+      .order("start_time", { ascending: true });
+    if (error) {
+      console.error(error);
+      $("blocked-slots").textContent = "讀取封鎖時段失敗，請確認館員權限。";
+      return;
+    }
+    if (!data?.length) {
+      $("blocked-slots").innerHTML = '<div class="empty">目前沒有已封鎖時段。</div>';
+      return;
+    }
+    $("blocked-slots").innerHTML = `
+      <table>
+        <thead><tr><th>館室</th><th>日期</th><th>時段</th><th>原因</th><th>操作</th></tr></thead>
+        <tbody>
+          ${data.map(slot => `
+            <tr>
+              <td>${esc(rooms[slot.room_code] || "閱覽室")}</td>
+              <td>${esc(slot.reservation_date)}</td>
+              <td>${esc(slot.start_time.slice(0, 5))}–${esc(window.AppUtils.endTime(slot.start_time))}</td>
+              <td>${esc(slot.reason)}</td>
+              <td><button class="unblock-button" type="button" data-unblock="${esc(slot.id)}" aria-label="解除 ${esc(rooms[slot.room_code] || "閱覽室")} ${esc(slot.reservation_date)} ${esc(slot.start_time.slice(0, 5))} 封鎖">解除封鎖</button></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+    document.querySelectorAll("[data-unblock]").forEach(button => {
+      button.onclick = () => unblockSlot(button.dataset.unblock);
+    });
+  }
+
+  async function unblockSlot(id) {
+    if (profile?.role !== "librarian") {
+      notify("此功能僅限館員使用。");
+      return;
+    }
+    const button = Array.from($("blocked-slots").querySelectorAll("[data-unblock]"))
+      .find(candidate => candidate.dataset.unblock === id);
+    const row = button?.closest("tr");
+    const description = row ? row.cells[0].textContent + " " + row.cells[1].textContent + " " + row.cells[2].textContent : "此筆封鎖";
+    if (!confirm(`確定解除「${description}」的時段封鎖？`)) return;
+
+    const { data, error } = await sb.from("blocked_slots").delete().eq("id", id).select("id").maybeSingle();
+    if (error || !data) {
+      notify("解除封鎖失敗，請確認館員權限並重新整理清單。");
+      return;
+    }
+    notify("時段封鎖已解除。");
+    await Promise.all([loadBlockedSlots(), refreshSeats()]);
+  }
+
   async function toggleSeat() {
+    if (profile?.role !== "librarian") {
+      notify("此功能僅限館員使用。");
+      return;
+    }
     const room = $("admin-room").value, n = Number($("admin-seat").value);
     const { data, error } = await sb.from("seats").select("id,is_active").eq("room_code", room).eq("seat_no", n).maybeSingle();
     if (error || !data) {
@@ -1127,6 +1338,10 @@
   }
 
   async function blockSlot() {
+    if (profile?.role !== "librarian") {
+      notify("此功能僅限館員使用。");
+      return;
+    }
     const payload = {
       room_code: $("block-room").value,
       reservation_date: $("block-date").value,

@@ -1,0 +1,1 @@
+- [Temporary static server](temporary-static-server.md) — serving this static site on port 5000 can trigger automatic `.replit` changes; restore through validation if unintended.

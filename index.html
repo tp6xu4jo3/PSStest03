@@ -5,15 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#081522">
   <title>夜讀・閱覽室座位預約</title>
-  <meta name="description" content="夜讀圖書館閱覽室座位預約系統，提供北側與南側閱覽室座位狀態即時檢視、時段預約、個人預約管理與館員管理功能。">
+  <meta name="description" content="夜讀圖書館閱覽室座位預約系統，提供北側、南側與 2 樓閱覽室座位狀態即時檢視、時段預約、個人預約管理與館員管理功能。">
   <meta property="og:title" content="夜讀・閱覽室座位預約">
-  <meta property="og:description" content="夜讀圖書館閱覽室座位預約系統，提供北側與南側閱覽室座位狀態即時檢視、時段預約、個人預約管理與館員管理功能。">
+  <meta property="og:description" content="夜讀圖書館閱覽室座位預約系統，提供北側、南側與 2 樓閱覽室座位狀態即時檢視、時段預約、個人預約管理與館員管理功能。">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="app-utils.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -32,7 +33,7 @@
 
     <section id="booking-view" class="view">
       <div class="controls panel">
-        <label>閱覽室<select id="room-select"><option value="north">北側閱覽室</option><option value="south">南側閱覽室</option></select></label>
+        <label>閱覽室<select id="room-select"><option value="north">北側閱覽室</option><option value="south">南側閱覽室</option><option value="floor2">2 樓閱覽區</option></select></label>
         <label>預約日期<input id="date-select" type="date"></label>
         <label>開始時段<select id="slot-select"></select></label>
         <label class="filter-toggle"><input id="bookable-only" type="checkbox" disabled><span>只看可預約</span></label>
@@ -69,10 +70,24 @@
     <section id="admin-view" class="view hidden">
       <div class="page-heading"><span class="eyebrow">LIBRARIAN / 03</span><h2>館員管理</h2><p>檢視預約、管理座位狀態與封鎖時段。</p></div>
       <div class="admin-grid">
-        <section class="panel admin-card"><h3>停用 / 啟用座位</h3><label>閱覽室<select id="admin-room"><option value="north">北側閱覽室</option><option value="south">南側閱覽室</option></select></label><label>座位<select id="admin-seat"></select></label><button id="toggle-seat" class="secondary-button">切換座位狀態</button></section>
-        <section class="panel admin-card"><h3>封鎖時段</h3><label>閱覽室<select id="block-room"><option value="north">北側閱覽室</option><option value="south">南側閱覽室</option></select></label><label>日期<input id="block-date" type="date"></label><label>時段<select id="block-slot"></select></label><label>原因<input id="block-reason" maxlength="120" placeholder="例：設備維護"></label><button id="block-submit" class="secondary-button">封鎖此時段</button></section>
+        <section class="panel admin-card"><h3>停用 / 啟用座位</h3><label>閱覽室<select id="admin-room"><option value="north">北側閱覽室</option><option value="south">南側閱覽室</option><option value="floor2">2 樓閱覽區</option></select></label><label>座位<select id="admin-seat"></select></label><button id="toggle-seat" class="secondary-button">切換座位狀態</button></section>
+        <section class="panel admin-card"><h3>封鎖時段</h3><label>閱覽室<select id="block-room"><option value="north">北側閱覽室</option><option value="south">南側閱覽室</option><option value="floor2">2 樓閱覽區</option></select></label><label>日期<input id="block-date" type="date"></label><label>時段<select id="block-slot"></select></label><label>原因<input id="block-reason" maxlength="120" placeholder="例：設備維護"></label><button id="block-submit" class="secondary-button">封鎖此時段</button></section>
       </div>
-      <section class="panel admin-table"><div class="section-heading"><h3>近期預約</h3><button id="admin-refresh" class="text-button">重新整理 ↻</button></div><div id="all-reservations" class="table-wrap">載入中…</div></section>
+      <section class="panel admin-table">
+        <div class="section-heading"><h3>預約紀錄</h3><div class="admin-actions"><button id="admin-export-csv" class="secondary-button admin-action-button">匯出 CSV</button><button id="admin-refresh" class="text-button">重新整理 ↻</button></div></div>
+        <div class="admin-filters">
+          <label>閱覽室<select id="admin-filter-room"><option value="">全部館室</option><option value="north">北側閱覽室</option><option value="south">南側閱覽室</option><option value="floor2">2 樓閱覽區</option></select></label>
+          <label>日期起<input id="admin-filter-date-from" type="date"></label>
+          <label>日期迄<input id="admin-filter-date-to" type="date"></label>
+          <label>狀態<select id="admin-filter-status"><option value="">全部狀態</option><option value="confirmed">已確認</option><option value="cancelled">已取消</option></select></label>
+        </div>
+        <div id="admin-result-count" class="admin-result-count" role="status"></div>
+        <div id="all-reservations" class="table-wrap">載入中…</div>
+      </section>
+      <section class="panel admin-table">
+        <div class="section-heading"><h3>已封鎖時段</h3><button id="blocked-refresh" class="text-button">重新整理 ↻</button></div>
+        <div id="blocked-slots" class="table-wrap">載入中…</div>
+      </section>
     </section>
   </main>
 

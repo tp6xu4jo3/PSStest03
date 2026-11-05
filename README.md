@@ -1,13 +1,15 @@
 # 夜讀・圖書館閱覽室座位預約
 
-原生 HTML / CSS / JavaScript，部署到 GitHub Pages；Supabase 提供 Auth、Postgres、RLS 與 RPC。
+原生 HTML / CSS / JavaScript，部署到 GitHub Pages；Supabase 提供 Auth、Postgres、RLS 與 RPC。提供北側、南側及 2 樓閱覽區的座位查詢與預約。
 
 ## 專案檔案
 - `index.html`：網站頁面
 - `styles.css`：夜間圖書館視覺
 - `app.js`：Supabase 前端流程
+- `app-utils.js`：CSV 輸出、安全逸出與共用轉換
 - `config.js`：只填 Supabase URL 與 Publishable key
 - `setup.sql`：資料表、RLS、預約 RPC、註冊限流
+- `setup_incremental_floor2_room.sql`：保留既有資料，增量新增 2 樓閱覽區及 10 席
 - `supabase/functions/register-student/index.ts`：學生註冊 Edge Function
 
 ## 重要設計
@@ -17,6 +19,7 @@
 - 座位預約由 `book_seat` RPC 執行，DB unique partial index 保證同座位、同日期、同時段只能一筆有效預約。
 - 日期和時段規則在 DB 驗證：台北日期今天至第 7 天、每日 09:00–20:00 開始（每段一小時，最後一段 20:00–21:00）。
 - 學生只能讀取自己的預約；館員可讀取全部並管理座位、封鎖時段。
+- 館員管理頁可解除單筆封鎖及匯出篩選後的預約 CSV；解除封鎖由資料庫 RLS 限制為館員。
 - 註冊需 Cloudflare Turnstile token；Edge Function 再以 IP 雜湊做每小時最多 5 次限制。
 
 ## A. 建立 Supabase 專案
@@ -24,9 +27,16 @@
 2. Authentication → Providers → Email：保持 Email provider 啟用。此專案以合成的 `.invalid` Email 作為登入識別，不寄送驗證信。
 3. Authentication → Settings：若有「Confirm email」設定，無需依賴它；Edge Function 建立帳號時明確設 `email_confirm: true`。
 4. SQL Editor → New query，貼上整份 `setup.sql` → Run。
-5. Table Editor 確認 `seats` 有 24 筆（north/south 各 12）、`profiles` / `reservations` / `blocked_slots` 已建立。
+5. Table Editor 確認 `profiles` / `reservations` / `blocked_slots` 已建立。
 6. Database → Functions 確認 `book_seat`、`cancel_reservation`、`is_librarian`、`allow_registration_attempt` 存在。
 7. Authentication → Users 初始可為空；完成註冊後會看到 Auth user。
+8. 若資料庫尚未有現行北側／南側完整席位，先依需求執行 `setup_incremental_seats.sql`；再執行 `setup_incremental_floor2_room.sql`。兩份都是增量 SQL，不會重建或清空資料表。
+
+## 新增 2 樓閱覽區
+
+在 Supabase Dashboard → SQL Editor 執行 `setup_incremental_floor2_room.sql`。腳本只擴充 `seats`、`blocked_slots`、`reservations` 的館室代碼檢查條件，並以 `ON CONFLICT DO NOTHING` 新增 `floor2` 的 1–10 號座位；既有北側、南側座位、預約與啟用狀態會保留。可重複執行。
+
+若要回復此功能，請先另行備份並評估相關預約與封鎖資料；不要直接刪除資料表或重跑初始化腳本。
 
 ## B. 設定 Turnstile
 1. 到 Cloudflare Dashboard → Turnstile 建立 Widget，選 GitHub Pages 網域（測試時可加入 localhost）。
