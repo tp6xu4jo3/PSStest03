@@ -109,11 +109,11 @@
       <div class="admin-grid">
         <section class="panel admin-card vision-simulator">
           <h3>模擬攝影機物品偵測</h3>
-          <p class="fineprint">以人工輸入的「偵測到物品」訊號，模擬電腦比對該時段的座位登記。沒有連接攝影機，也沒有儲存影像。</p>
+          <p class="fineprint">以人工輸入的「偵測到物品」訊號，模擬電腦比對所選測試時段的登記。未連接攝影機、不儲存影像。</p>
           <label>包廂<select id="vision-room"><option value="b1a">A · Cozy Room</option><option value="b1b">B · Sleepy Room</option><option value="b1c">C · Discipline Room</option></select></label>
           <label>座位<select id="vision-seat"></select></label>
-          <label>觀察日期<input type="date" id="vision-date"></label>
-          <label>觀察時段<select id="vision-slot"></select></label>
+          <label>模擬觀察日期<input type="date" id="vision-date"></label>
+          <label>模擬觀察時段<select id="vision-slot"></select></label>
           <label>辨識物品<select id="vision-object"><option value="bag">背包</option><option value="books">書籍</option></select></label>
           <button id="vision-simulate" class="secondary-button" type="button">模擬偵測並比對</button>
         </section>
