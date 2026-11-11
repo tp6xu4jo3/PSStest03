@@ -1,38 +1,65 @@
+
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-// room-data.js is a browser script. Supply a global window only within this test process.
 global.window = {};
 require("../room-data.js");
-const designs = window.ROOM_DESIGNS, equipment = window.ROOM_EQUIPMENT;
+const designs = window.ROOM_DESIGNS;
+const equipment = window.ROOM_EQUIPMENT;
 
-test("three extra study rooms have the expected distinct capacities", () => {
+test("three rooms retain their database-compatible seat counts", () => {
   assert.deepEqual(
-    Object.fromEntries(Object.entries(designs).map(([key, room]) => [key, room.seats.length])),
+    Object.fromEntries(Object.entries(designs).map(([code, room]) => [code, room.seats.length])),
     { b1a: 12, b1b: 16, b1c: 20 }
   );
 });
 
-test("every room seat has unique sequential identifiers and valid positions", () => {
+test("every chair is unique, selectable and has valid equipment", () => {
   for (const room of Object.values(designs)) {
-    const labels = room.seats.map(seat => seat.code);
-    assert.equal(new Set(labels).size, labels.length);
-    room.seats.forEach((seat, i) => {
-      assert.equal(seat.no, i + 1);
-      assert.equal(seat.code, room.code + String(i + 1).padStart(2, "0"));
-      assert.ok(seat.x >= 0 && seat.x <= 100);
-      assert.ok(seat.y >= 0 && seat.y <= 100);
+    const identifiers = new Set();
+    room.seats.forEach((seat, index) => {
+      assert.equal(seat.no, index + 1);
+      assert.equal(seat.code, room.code + String(index + 1).padStart(2, "0"));
+      assert.ok(!identifiers.has(seat.code));
+      identifiers.add(seat.code);
+      assert.ok(seat.x >= 8 && seat.x <= 92, seat.code);
+      assert.ok(seat.y >= 10 && seat.y <= 90, seat.code);
+      assert.ok(["lounge", "recliner", "workbench"].includes(seat.shape));
       assert.ok(seat.equipment.length > 0);
       seat.equipment.forEach(key => assert.ok(equipment[key], key));
     });
   }
 });
 
-test("each room has a distinct desk arrangement and defined walker routes", () => {
-  const layouts = Object.values(designs).map(room => JSON.stringify(room.seats.map(seat => [seat.x,seat.y])));
-  assert.equal(new Set(layouts).size, 3);
+test("layouts have separate furniture types, room outlines and windows", () => {
+  assert.equal(new Set(Object.values(designs).map(room => room.seats[0].shape)).size, 3);
+  assert.equal(new Set(Object.values(designs).map(room => room.outline)).size, 3);
+  assert.equal(new Set(Object.values(designs).map(room => room.window)).size, 3);
+  assert.ok(designs.b1b.seats.every(seat => seat.equipment.includes("recline")));
+  assert.ok(designs.b1c.seats.every(seat => seat.equipment.includes("divider")));
+  assert.ok(designs.b1c.decor.filter(item => item.type === "workbench").length >= 4);
+  assert.ok(Object.values(designs).some(room => room.decor.some(item => item.type === "column")));
+});
+
+test("seat models have non-overlapping center coordinates", () => {
   for (const room of Object.values(designs)) {
-    assert.ok(room.walkers.length >= 1);
-    room.walkers.forEach(walker => assert.ok(["horizontal", "vertical"].includes(walker.path)));
+    for (let i = 0; i < room.seats.length; i++) {
+      for (let j = i + 1; j < room.seats.length; j++) {
+        const a = room.seats[i], b = room.seats[j];
+        assert.ok(Math.hypot(a.x - b.x, a.y - b.y) >= 12, `${a.code} overlaps ${b.code}`);
+      }
+    }
+  }
+});
+
+test("walking characters have valid bounded travel paths", () => {
+  for (const room of Object.values(designs)) {
+    assert.ok(room.walkers.length > 0);
+    room.walkers.forEach(walker => {
+      for (const key of ["x", "y", "dx", "dy", "delay"]) {
+        assert.ok(Number.isFinite(walker[key]));
+      }
+      assert.ok(Math.abs(walker.dx) <= 100 && Math.abs(walker.dy) <= 100);
+    });
   }
 });
