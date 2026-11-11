@@ -20,7 +20,7 @@
 │  ├─ migrations/
 │  │  └─ 20261111_ntut_b1_demo.sql   **既有資料庫**升級用
 │  └─ functions/
-│     └─ register-student/
+│     └─ account/
 │        └─ index.ts             註冊Edge Function
 └─ tests/
    └─ app-utils.test.js          CSV與時間格式單元測試
@@ -32,7 +32,7 @@
 
 1. **現有資料庫：** Supabase → SQL Editor，執行 [`supa/migrations/20261111_ntut_b1_demo.sql`](supa/migrations/20261111_ntut_b1_demo.sql)。它擴充原有資料表並建立B1示範座位與`seat_reports`，不會刪除舊資料。
 2. **全新資料庫：**先執行 [`supa/setup.sql`](supa/setup.sql)，再執行前述增量SQL。舊版初始化內容保留作為新資料庫的結構前置。
-3. **註冊Function：**Supabase → Edge Functions → `register-student`，部署 [`supa/functions/register-student/index.ts`](supa/functions/register-student/index.ts)。
+3. **註冊Function：**Supabase → Edge Functions → `account`，用 [`supa/functions/account/index.ts`](supa/functions/account/index.ts) 更新既有的 `account` Function。`account` 是部署名稱，檔案仍叫 `index.ts`。
 4. **無需其他第三方設定：**註冊只使用原有的Supabase Auth、Edge Function與Postgres限流函式`allow_registration_attempt`（位於`supa/setup.sql`）；新的Edge Function會對同一虛構測試編號每小時限制5次註冊嘗試，僅保存識別碼雜湊。更新Edge Function後即不需要額外驗證服務或其金鑰。
 5. **安全提醒：**不得把Supabase Service Role Key放進前端。此註冊方式沒有真人驗證，使用者可更換編號，限流不能完全阻止大量自動註冊；僅供教學原型，公開正式服務需另行評估安全性。原型帳號不能當作北科大校務登入。
 
@@ -42,10 +42,10 @@ Supabase CLI預設讀取**`supabase/functions/`**，而本repo依需求將後台
 
 ```bash
 mkdir -p supabase/functions
-cp -R supa/functions/register-student supabase/functions/
+cp -R supa/functions/account supabase/functions/
 supabase login
 supabase link --project-ref YOUR_PROJECT_REF
-supabase functions deploy register-student
+supabase functions deploy account
 ```
 
 可改用Supabase Dashboard的Edge Function編輯器手動更新程式，不必建立臨時目錄。必須確認執行環境可讀取`SUPABASE_URL`與`SUPABASE_SERVICE_ROLE_KEY`。

@@ -352,7 +352,7 @@
     setBusy(btn, true);
     try {
       if (currentAuth === "register") {
-        const { data, error } = await sb.functions.invoke("register-student", {
+        const { data, error } = await sb.functions.invoke("account", {
           body: { student_id: id, password: pw }
         });
         if (error) throw error;
