@@ -361,7 +361,7 @@
       }
     }
 
-    return null; // 全部客滿
+    return candidateSlots[0]; // 即使全滿也顯示已登記座位，方便查看與回報。
   }
 
   function fillSlots(selectedVal) {
