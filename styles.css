@@ -450,3 +450,10 @@ button:active:not(:disabled){transform:translateY(2px) scale(.985)}
 #camera-alerts .unblock-button{min-width:135px;padding:8px 10px;border-radius:6px;white-space:normal}
 #camera-alerts table{width:100%}
 @media(max-width:600px){.vision-seat-status{font-size:10px}.detected-object{width:22px;height:22px}}
+
+
+.camera-alert-badge{display:inline-flex;justify-content:center;align-items:center;min-width:20px;height:20px;margin-left:5px;padding:0 5px;background:#c45736;color:#fff4e3;border:1px solid #e28d5d;border-radius:12px;font:700 10px "DM Mono",monospace;box-shadow:0 0 12px #d67a3d55}
+.personal-reports{margin-top:22px;padding:20px 24px}
+.personal-reports h3{margin:0 0 8px;font-size:16px}
+.personal-reports .fineprint{font-size:11px;color:#9eb4bc}
+@media(max-width:600px){.personal-reports{margin-top:16px;padding:16px}}
