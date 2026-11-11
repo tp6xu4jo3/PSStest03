@@ -388,3 +388,37 @@ button:active:not(:disabled){transform:translateY(2px) scale(.985)}
 }
 
 .experience-grid .legend .key.booked{background:#b63341;border-color:#f1727a}
+
+
+/* Discipline Room: 四張連續長桌，桌面分席，座椅在桌子兩側。 */
+.iso-discipline .room-prop.prop-workbench{width:38%;height:17%;z-index:2;transform:translate(-50%,-50%)}
+.iso-discipline .prop-bench-top{position:absolute;inset:5% 1% 21%;border:2px solid #d3d1bf;border-radius:5px;background:linear-gradient(155deg,#b9b9ad,#909f9b 65%,#839494);box-shadow:0 7px 0 #536c6b,0 11px 9px #07191d80}
+.iso-discipline .prop-bench-top::before{content:"";position:absolute;top:49%;left:1%;right:1%;height:3px;background:#52686b;box-shadow:0 1px 0 #dbe0d1}
+.iso-discipline .prop-bench-support{left:6%;right:6%;bottom:8%;height:7px;border-radius:2px;background:#435a5d}
+.iso-discipline .bench-places{position:absolute;left:2%;right:2%;top:6%;bottom:22%;z-index:3}
+.iso-discipline .bench-place{position:absolute;left:calc(var(--station-slot)*100%/var(--station-count));width:calc(100%/var(--station-count));height:50%;border-right:2px solid #60747480;background:transparent;transition:background-color .2s ease;box-sizing:border-box}
+.iso-discipline .bench-north{top:0}
+.iso-discipline .bench-south{top:50%;border-top:1px solid #6c8587}
+.iso-discipline .bench-place:last-child{border-right:0}
+.iso-discipline .bench-place.is-booked{background:linear-gradient(140deg,#f56b7299,#af344c99);box-shadow:inset 0 0 7px #e23c5c66}
+.iso-discipline .bench-place.is-selected{outline:2px solid #f2d4a4;outline-offset:-2px;background-color:#ffe3b52a}
+.iso-discipline .bench-place.is-hovered{background-color:#f7dfbc38}
+.iso-discipline .bench-place.is-offline:not(.is-booked){background-color:#25393b87}
+.iso-discipline .bench-place{pointer-events:none}
+.iso-discipline .seat-form-workbench{width:8.5%;height:10%;min-width:37px;min-height:36px}
+.iso-discipline .workbench-model{position:absolute;inset:0;display:block}
+.iso-discipline .workbench-model .seat-chair{position:absolute;left:15%;top:20%;width:70%;height:67%;border-radius:8px;background:#536d74;box-shadow:0 4px 0 #2e4249,0 7px 6px #06181db3}
+.iso-discipline .workbench-model .chair-back{height:43%;background:#95adb0;border-radius:8px 8px 3px 3px}
+.iso-discipline .workbench-model .chair-cushion{left:16%;right:16%;bottom:2%;height:54%;background:#718d91}
+.iso-discipline .seat-form-workbench.facing-south .seat-chair{transform:rotate(180deg)}
+.iso-discipline .seat-form-workbench .seat-label{top:-7px;font-size:10px}
+.iso-discipline .bench-chair-gear{position:absolute;top:40%;right:-10px;display:flex;flex-direction:column;gap:1px;color:#e4d7bb;font-size:8px;text-shadow:0 1px 3px #0b161f}
+.iso-discipline .seat-occupied .seat-chair{background:#b53c4c!important;border:1px solid #f1a4a2}
+.iso-discipline .seat-occupied .chair-back{background:#ef8c91!important}
+.iso-discipline .seat-occupied .chair-cushion{background:#d26471!important}
+.iso-discipline .seat-occupied .bench-chair-gear{color:#ffe4db}
+.iso-discipline .seat-object.is-selected .seat-chair{outline:2px solid #ffddb5;outline-offset:2px}
+@media(max-width:600px){
+  .iso-discipline .seat-form-workbench{width:47px;height:43px}
+  .iso-discipline .room-prop.prop-workbench{height:18%}
+}
