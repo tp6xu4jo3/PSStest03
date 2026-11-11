@@ -1,62 +1,86 @@
-/* 三間「額外新建」包廂的設計提案配置。非北科大館方核定平面圖、設備或即時數據。 */
 (() => {
   "use strict";
-  const gear = {
-    power: { icon: "plug-zap", label: "電源插座", mark: "⚡" },
-    lamp: { icon: "lamp-desk", label: "個人檯燈", mark: "✦" },
-    divider: { icon: "panels-top-left", label: "隔板", mark: "▣" },
-    monitor: { icon: "monitor", label: "外接螢幕", mark: "▤" },
-    usb: { icon: "usb", label: "USB充電", mark: "⌁" }
+  const equipment = {
+    power: { label: "電源插座", mark: "⚡" },
+    lamp: { label: "閱讀燈", mark: "✦" },
+    usb: { label: "USB充電", mark: "⌁" },
+    recline: { label: "平躺休憩椅", mark: "◒" },
+    privacy: { label: "包覆式遮蔽", mark: "◫" },
+    divider: { label: "桌面隔板", mark: "▥" },
+    monitor: { label: "外接螢幕", mark: "▣" }
   };
-  const coords = (xs, ys) => ys.flatMap((y, row) => xs.map((x, col) => ({ x, y, row, col })));
-  const cozy = coords([17, 38, 62, 83], [23, 47, 71]);
-  // B室分為兩條沿牆工作檯與中央兩組桌，形成兩道走道。
-  const sleepy = [
-    ...[15, 32, 50, 68].map((y) => ({x: 14, y})),
-    ...[15, 32, 50, 68].map((y) => ({x: 85, y})),
-    ...coords([38, 62], [18, 38, 58, 78])
-  ];
-  // C室採5×4規律排列，適合偏好明確秩序的使用者。
-  const discipline = coords([12, 30, 50, 70, 88], [16, 36, 56, 76]);
-  const seats = (positions, code, chooser) => positions.map((p,i) => ({
+
+  const locations = (values, room, shape, equip) => values.map(([x, y, facing = "front"], i) => ({
     no: i + 1,
-    code: `${code}${String(i + 1).padStart(2, "0")}`,
-    x: p.x, y: p.y,
-    equipment: chooser(i,p),
-    facing: code === "B" && i < 8 ? (i < 4 ? "right" : "left") : "up"
+    code: room + String(i + 1).padStart(2, "0"),
+    x, y, facing, shape,
+    equipment: equip(i)
   }));
+
   const data = {
     b1a: {
-      code: "A", name: "Cozy Room", subtitle: "溫柔明亮・留一點餘裕",
-      description: "像自己的閱讀角落，木質桌面、綠意與柔和光線構成安靜的包廂。",
-      accent: "#97c8aa", glow: "151,200,170", floor: "cozy",
-      seats: seats(cozy, "A", (i) => ["power", ...(i % 3 !== 1 ? ["lamp"] : []), ...(i < 4 ? ["usb"] : [])]),
-      walkers: [{x:49,y:26,path:"vertical",delay:-2.1},{x:48,y:72,path:"horizontal",delay:-4.6}],
-      decor: [{type:"plant",x:5,y:10},{type:"plant",x:94,y:86},{type:"sofa",x:8,y:88}]
+      code: "A", name: "Cozy Room", subtitle: "柔和光線 · 自在閱讀",
+      description: "植栽、暖木桌與圍合式閱讀角落。",
+      accent: "#99c8ae", glow: "153,200,174", floor: "cozy",
+      outline: "soft-bay", window: "top",
+      seats: locations([
+        [17,20],[37,14],[64,15],[83,22],
+        [16,47],[35,40],[68,42],[85,51],
+        [17,78],[39,72],[65,74],[83,81]
+      ], "A", "lounge", i => ["power", ...(i % 3 !== 1 ? ["lamp"] : []), ...(i % 4 === 0 ? ["usb"] : [])]),
+      decor: [
+        {type:"plant",x:7,y:9},{type:"plant",x:92,y:11},
+        {type:"plant",x:92,y:89},{type:"plant",x:7,y:66},
+        {type:"round-table",x:51,y:25},{type:"rug",x:51,y:58},
+        {type:"sofa",x:8,y:91},{type:"shelf",x:94,y:69}
+      ],
+      walkers: [{x:51,y:38,dx:0,dy:82,delay:-2.7},{x:45,y:88,dx:65,dy:0,delay:-5.1}]
     },
     b1b: {
-      code: "B", name: "Sleepy Room", subtitle: "低刺激・沉靜思緒",
-      description: "深色軟裝、柔霧燈帶與略有遮蔽的書桌，適合偏好低刺激環境的人。",
+      code: "B", name: "Sleepy Room", subtitle: "靜謐休憩 · 低刺激",
+      description: "類航廈休憩躺椅、獨立遮光罩與柔和間接光。",
       accent: "#b4b2dd", glow: "180,178,221", floor: "sleepy",
-      seats: seats(sleepy, "B", (i) => ["power", "divider", ...(i % 4 === 0 ? ["lamp", "usb"] : [])]),
-      walkers: [{x:49,y:17,path:"vertical",delay:-3.8},{x:49,y:78,path:"horizontal",delay:-5.7}],
-      decor: [{type:"plant",x:94,y:8},{type:"shelf",x:5,y:82}]
+      outline: "alcove", window: "right",
+      seats: locations([
+        [14,16,"east"],[14,33,"east"],[14,50,"east"],[14,67,"east"],[14,84,"east"],
+        [86,16,"west"],[86,33,"west"],[86,50,"west"],[86,67,"west"],[86,84,"west"],
+        [37,22],[63,22],[34,50],[66,50],[37,78],[63,78]
+      ], "B", "recliner", i => ["recline","privacy","power", ...(i % 3 === 0 ? ["usb"] : [])]),
+      decor: [
+        {type:"plant",x:5,y:7},{type:"plant",x:93,y:93},
+        {type:"column",x:50,y:7},{type:"column",x:50,y:92},
+        {type:"light-strip",x:50,y:12},{type:"shelf",x:6,y:91}
+      ],
+      walkers: [{x:49,y:29,dx:0,dy:78,delay:-1.9},{x:47,y:69,dx:52,dy:0,delay:-6.2}]
     },
     b1c: {
-      code: "C", name: "Discipline Room", subtitle: "節奏清晰・專注推進",
-      description: "整齊配置與清楚動線，讓每個座位都有同樣明確的工作節奏。",
+      code: "C", name: "Discipline Room", subtitle: "清晰分區 · 集中工作",
+      description: "共享工作長桌與座位隔板，保留中央通行軸線。",
       accent: "#e4be8c", glow: "228,190,140", floor: "discipline",
-      seats: seats(discipline, "C", (i) => ["power", ...(i % 2 === 0 ? ["lamp"] : []), ...(i % 5 === 2 ? ["monitor"] : [])]),
-      walkers: [{x:41,y:12,path:"vertical",delay:-1.2},{x:61,y:81,path:"horizontal",delay:-2.8}],
-      decor: [{type:"plant",x:5,y:8},{type:"plant",x:95,y:92}]
+      outline: "stepped", window: "left",
+      seats: locations([
+        [13,17],[29,16],[45,18],[21,39],[41,39],
+        [60,17],[77,16],[90,18],[68,39],[86,39],
+        [13,62],[29,62],[45,63],[21,85],[41,84],
+        [60,62],[77,62],[90,63],[68,85],[86,84]
+      ], "C", "workbench", i => ["power","divider", ...(i % 4 === 1 ? ["lamp"] : []), ...(i % 5 === 2 ? ["monitor"] : [])]),
+      decor: [
+        {type:"workbench",x:29,y:29},{type:"workbench",x:76,y:29},
+        {type:"workbench",x:29,y:74},{type:"workbench",x:76,y:74},
+        {type:"column",x:52,y:9},{type:"column",x:52,y:91},
+        {type:"plant",x:6,y:48},{type:"plant",x:94,y:51},
+        {type:"shelf",x:5,y:94}
+      ],
+      walkers: [{x:53,y:40,dx:0,dy:60,delay:-3.7},{x:47,y:53,dx:80,dy:0,delay:-5.6}]
     }
   };
-  Object.freeze(gear);
+
+  Object.freeze(equipment);
   for (const room of Object.values(data)) {
-    room.seats.forEach((seat) => Object.freeze(seat));
+    room.seats.forEach(seat => Object.freeze(seat));
     Object.freeze(room.seats);
     Object.freeze(room);
   }
   window.ROOM_DESIGNS = Object.freeze(data);
-  window.ROOM_EQUIPMENT = gear;
+  window.ROOM_EQUIPMENT = equipment;
 })();
