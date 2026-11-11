@@ -118,6 +118,14 @@ alter table public.camera_alerts
   add constraint camera_alerts_object_type_check
   check (object_type in ('bag','books','person'));
 
+-- 不向一般訪客揭露模擬管理員UUID及處理人身分。
+revoke select on public.camera_alerts from anon,authenticated;
+grant select (id,seat_id,room_code,object_type,status)
+  on public.camera_alerts to anon;
+grant select (id,seat_id,room_code,object_type,status,
+              observed_date,observed_slot,detected_at,resolved_at)
+  on public.camera_alerts to authenticated;
+
 revoke all on function public.get_seat_presence(text,date,time) from public;
 revoke all on function public.get_my_reservation_presence() from public;
 revoke all on function public.simulate_camera_presence(uuid,date,time,boolean) from public;
