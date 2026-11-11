@@ -58,7 +58,9 @@
         <section class="map-panel panel">
           <div class="legend">
             <span><i class="key available"></i>可登記</span>
-            <span><i class="key booked"></i>已登記</span>
+            <span><i class="key booked"></i>已登記／待報到</span>
+            <span><i class="key checked-in"></i>已報到</span>
+            <span><i class="key away"></i>暫離</span>
             <span><i class="key anomaly"></i>物品異常</span>
             <span><i class="key disabled"></i>停用</span>
             <span><i class="key selected"></i>已選取</span>
@@ -80,6 +82,7 @@
           <div id="seat-inspector" class="seat-inspector hidden" aria-live="polite">
             <div class="inspector-status-row"><span id="inspection-status" class="seat-state-pill">—</span><span id="inspection-code" class="seat-code-text">—</span></div>
             <div id="vision-seat-status" class="vision-seat-status hidden" role="status"></div>
+            <div id="presence-seat-status" class="presence-seat-status hidden" role="status"></div>
             <button id="report-reveal" type="button" class="report-reveal">回報此座位問題 <span aria-hidden="true">↗</span></button>
             <form id="issue-form" class="issue-form hidden">
               <input id="issue-seat" type="hidden">
@@ -108,14 +111,14 @@
       <div class="page-heading"><span class="eyebrow">LIBRARIAN / 03</span><h2>原型管理</h2><p>管理示範座位、模擬登記與使用者回報；不連接校方後台。</p></div>
       <div class="admin-grid">
         <section class="panel admin-card vision-simulator">
-          <h3>模擬攝影機物品偵測</h3>
-          <p class="fineprint">以人工輸入的「偵測到物品」訊號，模擬電腦比對所選測試時段的登記。未連接攝影機、不儲存影像。</p>
+          <h3>模擬攝影機偵測</h3>
+          <p class="fineprint">可模擬「有人／無人」來更新已預約座位的報到、暫離與回座，或模擬物品占位警報。這不會驗證使用者身分、取消預約或儲存攝影畫面。</p>
           <label>包廂<select id="vision-room"><option value="b1a">A · Cozy Room</option><option value="b1b">B · Sleepy Room</option><option value="b1c">C · Discipline Room</option></select></label>
           <label>座位<select id="vision-seat"></select></label>
           <label>模擬觀察日期<input type="date" id="vision-date"></label>
           <label>模擬觀察時段<select id="vision-slot"></select></label>
-          <label>辨識物品<select id="vision-object"><option value="bag">背包</option><option value="books">書籍</option></select></label>
-          <button id="vision-simulate" class="secondary-button" type="button">模擬偵測並比對</button>
+          <label>模擬偵測結果<select id="vision-object"><option value="person_present">偵測到人</option><option value="person_absent">未偵測到人</option><option value="bag">偵測到背包</option><option value="books">偵測到書籍</option></select></label>
+          <button id="vision-simulate" class="secondary-button" type="button">套用模擬偵測</button><p id="vision-feedback" class="vision-feedback" role="status" aria-live="polite">選擇已預約座位並模擬「偵測到人」即可報到。</p>
         </section>
         <section class="panel admin-card"><h3>停用 / 啟用座位</h3><label>閱覽室<select id="admin-room"><option value="b1a">A · Cozy Room</option><option value="b1b">B · Sleepy Room</option><option value="b1c">C · Discipline Room</option></select></label><label>座位<select id="admin-seat"></select></label><p id="admin-seat-status" class="admin-seat-status" role="status">讀取座位狀態中…</p><div class="admin-seat-actions"><button id="disable-seat" class="secondary-button" type="button">停用座位</button><button id="enable-seat" class="secondary-button" type="button">啟用座位</button></div></section>
         <section class="panel admin-card"><h3>封鎖時段</h3><label>閱覽室<select id="block-room"><option value="b1a">A · Cozy Room</option><option value="b1b">B · Sleepy Room</option><option value="b1c">C · Discipline Room</option></select></label><label>日期<input id="block-date" type="date"></label><label>時段<select id="block-slot"></select></label><label>原因<input id="block-reason" maxlength="120" placeholder="例：設備維護"></label><button id="block-submit" class="secondary-button">封鎖此時段</button></section>
