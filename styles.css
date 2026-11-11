@@ -422,3 +422,31 @@ button:active:not(:disabled){transform:translateY(2px) scale(.985)}
   .iso-discipline .seat-form-workbench{width:47px;height:43px}
   .iso-discipline .room-prop.prop-workbench{height:18%}
 }
+
+
+.key.anomaly{background:#f4af59;border-color:#d8873f;box-shadow:0 0 0 2px #edb76033}
+.seat-object.seat-anomaly{filter:drop-shadow(0 0 12px #f6a648bb)}
+.seat-object.seat-anomaly .seat-label{color:#fff5df;background:#995321;border-color:#ffca7e;box-shadow:0 0 12px #e9a95278}
+.seat-object.seat-anomaly .seat-point{background:#ffc05b;box-shadow:0 0 0 4px #ffc05b55,0 0 12px #fba349}
+.seat-object.seat-anomaly .seat-chair{outline:2px solid #ffb854;outline-offset:2px}
+.seat-object.seat-anomaly .pod-shell{border-color:#ffba6c}
+.seat-state-pill[data-status="alert"]{background:#49301f;color:#ffd89b;border-color:#b37d44}
+.vision-seat-status{padding:12px 13px;margin:10px 0 14px;border:1px solid #ba8448;border-left:3px solid #f3b764;border-radius:7px;background:#49302069;color:#f9dcab;font-size:11px;line-height:1.75}
+.detected-object{position:absolute;z-index:8;width:24px;height:24px;top:29%;left:44%;transform:rotate(-8deg);display:block;pointer-events:none;filter:drop-shadow(0 4px 3px #180f0d99)}
+.detected-object .bag-body{position:absolute;left:4px;top:7px;width:17px;height:16px;border-radius:5px 5px 4px 4px;background:linear-gradient(115deg,#f2c06d,#bd7a42 75%);border:2px solid #74482c;box-shadow:inset -3px 0 0 #92562f}
+.detected-object .bag-handle{position:absolute;left:9px;top:1px;width:9px;height:10px;border:3px solid #8e5b36;border-radius:6px 6px 2px 2px}
+.detected-object .bag-pocket{position:absolute;left:8px;top:14px;width:8px;height:5px;border:1px solid #875131;border-radius:2px;background:#e3a15b}
+.detected-object.object-books{transform:rotate(13deg)}
+.detected-object .book-bottom{position:absolute;left:2px;top:12px;width:22px;height:7px;border:1px solid #e6cb9b;border-left:4px solid #48657c;border-radius:2px;background:linear-gradient(#f9ebce,#d9ccbb);box-shadow:0 3px 0 #35516b}
+.detected-object .book-top{position:absolute;left:5px;top:5px;width:19px;height:7px;border:1px solid #eac7aa;border-left:4px solid #9c555a;border-radius:2px;background:linear-gradient(#ffe5bf,#d9b89b);box-shadow:0 2px 0 #774a55}
+.seat-form-recliner .detected-object{left:44%;top:44%;transform:scale(.85) rotate(10deg)}
+.seat-form-lounge .detected-object{left:47%;top:50%}
+.iso-discipline .bench-place.is-anomaly{background:linear-gradient(130deg,#f4a44e77,#f7d07a33);box-shadow:inset 0 0 0 2px #eeb05a}
+.iso-discipline .bench-place.is-anomaly .detected-object{left:34%;top:13%;transform:scale(.76) rotate(4deg)}
+.camera-alert-open{color:#ffd093;font-weight:600}
+.vision-simulator .fineprint{margin:8px 0 16px;line-height:1.65;color:#c2bcb7;font-size:11px}
+.vision-simulator #vision-simulate{margin-top:7px;border-color:#e5a35f;background:linear-gradient(140deg,#64432d,#453326);color:#ffdbac}
+.vision-simulator #vision-simulate:hover:not(:disabled){border-color:#ffce92;background:#71503a}
+#camera-alerts .unblock-button{min-width:135px;padding:8px 10px;border-radius:6px;white-space:normal}
+#camera-alerts table{width:100%}
+@media(max-width:600px){.vision-seat-status{font-size:10px}.detected-object{width:22px;height:22px}}
