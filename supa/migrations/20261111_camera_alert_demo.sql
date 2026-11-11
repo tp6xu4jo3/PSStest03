@@ -55,10 +55,20 @@ begin
      or p_object_type not in ('bag','books') then
     raise exception 'INVALID_OBSERVATION';
   end if;
+  if p_date < (now() at time zone 'Asia/Taipei')::date
+     or p_date > (now() at time zone 'Asia/Taipei')::date + 7 then
+    raise exception 'DATE_RANGE';
+  end if;
+  if p_start_time < time '09:00' or p_start_time >= time '21:00'
+     or extract(minute from p_start_time) <> 0
+     or extract(second from p_start_time) <> 0 then
+    raise exception 'TIME_RANGE';
+  end if;
   select * into v_seat from public.seats where id = p_seat_id for update;
   if not found or v_seat.room_code not in ('b1a','b1b','b1c') then
     raise exception 'SEAT_NOT_FOUND';
   end if;
+  if not v_seat.is_active then raise exception 'SEAT_DISABLED'; end if;
   if exists (
     select 1 from public.reservations r
     where r.seat_id = p_seat_id and r.reservation_date = p_date
