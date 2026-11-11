@@ -104,6 +104,7 @@
       selectedSeat = null;
       resetInspector();
       updateRoomFoot();
+      updateSummary();
       animateRoomSwitch();
       onDateOrRoomChanged();
     });
@@ -567,9 +568,10 @@
     $("availability-count").textContent = isBlocked ? "這個時段已封鎖"
       : `可登記 ${available} / ${totalActive} 席 · 原型資料`;
     showEmpty(seats.length < expected ? `本包廂已載入 ${seats.length}/${expected} 席，請執行新增座位SQL。` : "");
-    const fingerprint = JSON.stringify([room,isBlocked,seats.map(s=>[s.id,s.seat_no,s.is_active]),
+    const fingerprint = JSON.stringify([room,$("date-select").value,$("slot-select").value,
+      isBlocked,seats.map(s=>[s.id,s.seat_no,s.is_active]),
       [...bookedSet].sort(),selectedSeat,$("bookable-only").checked]);
-    if (mapSignature === fingerprint && mapRoom === room) return;
+    if (mapSignature === fingerprint && mapRoom === room && map.querySelector(".iso-room")) return;
     const roomChanged = mapRoom !== room;
     mapSignature = fingerprint;
     mapRoom = room;
@@ -875,6 +877,7 @@
   // --- 館員管理 ---
   async function loadAdmin() {
     if (profile?.role !== "librarian") return;
+    updateAdminSeatState();
     await Promise.all([loadAdminReservations(), loadBlockedSlots(), loadIssueReports()]);
   }
 
