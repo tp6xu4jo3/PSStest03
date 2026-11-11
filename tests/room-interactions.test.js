@@ -39,7 +39,7 @@ class Element {
       this.sub["seat-model"] = new Element("span");
     }
     if (html.includes('data-bench-seat="')) {
-      for (const match of html.matchAll(/data-bench-seat="(\\d+)"/g)) {
+      for (const match of html.matchAll(/data-bench-seat="(\d+)"/g)) {
         const place = new Element("span");
         place.className = "bench-place";
         place.dataset.benchSeat = match[1];
