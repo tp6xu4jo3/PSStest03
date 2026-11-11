@@ -15,6 +15,7 @@
   let cachedReservations = [];
   let adminLoadId = 0, filteredAdminReservations = [];
   let mapRoom = null, roomSwitchId = 0, adminSeatReadId = 0;
+  let knownCameraAlertIds = null, cameraBadgeRequestId = 0;
 
   // --- 台北時區處理 ---
   function getTaipeiDateTime() {
@@ -267,6 +268,7 @@
     pollingTimer = setInterval(() => {
       if (document.visibilityState === "visible") {
         refreshSeats({ isBackground: true });
+        if (profile?.role === "librarian") updateCameraBadge();
       }
     }, 5000);
   }
@@ -403,6 +405,12 @@
     $("auth-open").classList.toggle("hidden", !!session);
     $("logout").classList.toggle("hidden", !session);
     document.querySelectorAll(".admin-only").forEach(x => x.classList.toggle("hidden", profile?.role !== "librarian"));
+    if (profile?.role === "librarian") updateCameraBadge();
+    else {
+      ++cameraBadgeRequestId;
+      knownCameraAlertIds = null;
+      $("camera-alert-badge").classList.add("hidden");
+    }
   }
 
   function openAuth() {
@@ -1041,7 +1049,7 @@
   async function loadAdmin() {
     if (profile?.role !== "librarian") return;
     updateAdminSeatState();
-    await Promise.all([loadAdminReservations(), loadBlockedSlots(), loadIssueReports(), loadCameraAlerts()]);
+    await Promise.all([loadAdminReservations(), loadBlockedSlots(), loadIssueReports(), loadCameraAlerts(), updateCameraBadge()]);
   }
 
   function getAdminFilters() {
@@ -1287,6 +1295,22 @@
         ? "座位資料尚未建立，請先執行座位SQL。"
         : "模擬偵測無法完成，請先在Supabase執行攝影機異常SQL。");
     } finally { setBusy(button, false, "模擬偵測並比對"); }
+  }
+
+  async function updateCameraBadge() {
+    if (profile?.role !== "librarian" || !sb) return;
+    const requestId = ++cameraBadgeRequestId;
+    const {data, error} = await sb.from("camera_alerts")
+      .select("id").eq("status","open").limit(500);
+    if (requestId !== cameraBadgeRequestId || profile?.role !== "librarian" || error) return;
+    const current = new Set((data || []).map(item => item.id));
+    const newCount = knownCameraAlertIds === null ? 0
+      : [...current].filter(id => !knownCameraAlertIds.has(id)).length;
+    knownCameraAlertIds = current;
+    const badge = $("camera-alert-badge");
+    badge.textContent = String(current.size);
+    badge.classList.toggle("hidden", current.size === 0);
+    if (newCount > 0) notify(`有${newCount}筆新的座位物品異常，請至管理頁處理。`);
   }
 
   async function loadCameraAlerts() {
