@@ -386,3 +386,5 @@ button:active:not(:disabled){transform:translateY(2px) scale(.985)}
 @media(prefers-reduced-motion:reduce){
   .room-people .visitor,.seat-form-recliner .desk-reader{animation:none}
 }
+
+.experience-grid .legend .key.booked{background:#b63341;border-color:#f1727a}
