@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="styles.css">
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script defer src="app-utils.js"></script>
   <script defer src="app.js"></script>
 </head>
@@ -66,9 +67,7 @@
           <small class="fineprint">僅供流程測試 · 不會登記北科大真實座位</small>
         </aside>
       </div>
-    </section>
-
-    <section class="issue-panel panel" aria-labelledby="issue-title">
+      <section class="issue-panel panel" aria-labelledby="issue-title">
       <div class="section-heading"><div><span class="eyebrow">SEAT ISSUE / DEMO</span><h2 id="issue-title">座位異常回報</h2></div><span class="floor-tag">模擬通報</span></div>
       <p>遇到有人占位、設備損壞或座位資訊不一致？可以練習提報給原型管理員。這裡<b>不是北科大官方通報管道</b>；實際問題請依館方現行方式反映。</p>
       <form id="issue-form" class="issue-form">
@@ -78,6 +77,7 @@
         <button type="submit" id="issue-submit" class="secondary-button">送出模擬回報</button>
       </form>
       <small class="fineprint">回報僅保存在本原型資料庫；同一使用者對同一示範座位的同類問題，未結案前只能回報一次。</small>
+      </section>
     </section>
 
     <section id="mine-view" class="view hidden">
@@ -118,7 +118,7 @@
   <div id="auth-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title">
     <div class="modal-card panel"><button class="modal-close" id="auth-close" aria-label="關閉">×</button><span class="eyebrow">MEMBER ACCESS</span><h2 id="auth-title">原型測試帳號</h2><p class="modal-desc">僅供教學模擬，請勿輸入真實學號或慣用密碼；帳號並不驗證北科大身分。</p>
       <div class="tabs"><button class="tab active" data-auth="login">登入</button><button class="tab" data-auth="register">建立帳號</button></div>
-      <form id="auth-form"><label>9 位數虛構測試編號<input id="student-id" inputmode="numeric" pattern="[0-9]{9}" maxlength="9" placeholder="例：001123456" required></label><label>密碼<input id="password" type="password" minlength="8" autocomplete="current-password" placeholder="至少 8 個字元" required></label><button class="primary-button" id="auth-submit">登入 <span>↗</span></button></form>
+      <form id="auth-form"><label>9 位數虛構測試編號<input id="student-id" inputmode="numeric" pattern="[0-9]{9}" maxlength="9" placeholder="例：001123456" required></label><label>密碼<input id="password" type="password" minlength="8" autocomplete="current-password" placeholder="至少 8 個字元" required></label><div id="turnstile-container" class="hidden" aria-label="註冊人機驗證"></div><button class="primary-button" id="auth-submit">登入 <span>↗</span></button></form>
       <p class="fineprint">測試編號格式：前三碼 000–115，其餘六碼自訂。不可當成校方登入。</p>
     </div>
   </div>
