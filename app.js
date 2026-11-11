@@ -1,9 +1,11 @@
 (() => {
   const cfg = window.APP_CONFIG || {};
   const $ = (id) => document.getElementById(id);
-  const rooms = { b1a: "B1 自習室 A 區", b1b: "B1 自習室 B 區", b1c: "B1 自習室 C 區" };
+  const DESIGNS = window.ROOM_DESIGNS || {};
+  const EQUIPMENT = window.ROOM_EQUIPMENT || {};
+  const rooms = Object.fromEntries(Object.entries(DESIGNS).map(([key,room]) => [key, `${room.code} · ${room.name}`]));
   const ALL_SLOTS = Array.from({ length: 12 }, (_, i) => `${String(i + 9).padStart(2, "0")}:00`);
-  const ROOM_TOTALS = { b1a: 12, b1b: 12, b1c: 12 }; // 僅供原型展示，不代表官方 275 席分配
+  const ROOM_TOTALS = Object.fromEntries(Object.entries(DESIGNS).map(([key,room]) => [key,room.seats.length]));
 
   // 示範座位僅使用測試編號；不捏造館方真實座位排列與設備配置。
   let sb, session = null, profile = null, selectedSeat = null, seatView = null;
@@ -12,6 +14,7 @@
   let realtimeChannel = null, pollingTimer = null, remoteDebounceTimer = null;
   let cachedReservations = [];
   let adminLoadId = 0, filteredAdminReservations = [];
+  let mapSignature = "", mapRoom = null, roomSwitchId = 0, adminSeatReadId = 0;
 
   // --- 台北時區處理 ---
   function getTaipeiDateTime() {
@@ -72,7 +75,10 @@
   }
 
   function getSeatConfig(room, seatNo) {
-    return { no: seatNo, zone: rooms[room] || "B1 示範區", tag: "DEMO", features: [] };
+    const layout = DESIGNS[room]?.seats.find(seat => seat.no === seatNo);
+    return { no: seatNo, code: layout?.code || `#${seatNo}`, zone: DESIGNS[room]?.subtitle || "自習包廂", tag:"SEAT",
+      features:(layout?.equipment || []).map(key=>EQUIPMENT[key]?.label||key),
+      equipment:layout?.equipment||[] };
   }
 
   // --- 初始化流程 ---
@@ -90,22 +96,32 @@
 
     updateAdminSeatOptions();
     $("admin-room").addEventListener("change", updateAdminSeatOptions);
+    $("admin-seat").addEventListener("change", updateAdminSeatState);
     ["admin-filter-room", "admin-filter-date-from", "admin-filter-date-to", "admin-filter-status"]
       .forEach(id => $(id).addEventListener("change", loadAdminReservations));
 
     $("room-select").addEventListener("change", () => {
       selectedSeat = null;
+      resetInspector();
       updateRoomFoot();
+      animateRoomSwitch();
       onDateOrRoomChanged();
     });
+    document.querySelectorAll("[data-room]").forEach(button => button.addEventListener("click", () => {
+      if ($("room-select").value === button.dataset.room) return;
+      $("room-select").value = button.dataset.room;
+      $("room-select").dispatchEvent(new Event("change", {bubbles:true}));
+    }));
 
     $("date-select").addEventListener("change", () => {
       selectedSeat = null;
+      resetInspector();
       onDateOrRoomChanged();
     });
 
     $("slot-select").addEventListener("change", () => {
       selectedSeat = null;
+      resetInspector();
       refreshSeats();
     });
 
@@ -113,6 +129,12 @@
     $("clear-filter").onclick = clearFilter;
     $("confirm-booking").addEventListener("click", book);
     $("issue-form").addEventListener("submit", submitIssueReport);
+    $("report-reveal").addEventListener("click", () => {
+      if (!selectedSeat) return;
+      const form = $("issue-form");
+      form.classList.toggle("hidden");
+      $("report-reveal").setAttribute("aria-expanded", String(!form.classList.contains("hidden")));
+    });
     $("reports-refresh").addEventListener("click", loadIssueReports);
     $("auth-open").onclick = () => openAuth();
     $("auth-close").onclick = () => $("auth-modal").classList.add("hidden");
@@ -124,7 +146,8 @@
     $("admin-refresh").onclick = loadAdmin;
     $("blocked-refresh").onclick = loadBlockedSlots;
     $("admin-export-csv").onclick = exportAdminCsv;
-    $("toggle-seat").onclick = toggleSeat;
+    $("disable-seat").onclick = () => setSeatActive(false);
+    $("enable-seat").onclick = () => setSeatActive(true);
     $("block-submit").onclick = blockSlot;
 
     updateRoomFoot();
@@ -136,6 +159,7 @@
     }
 
     sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY);
+    updateAdminSeatState();
 
     setupRealtime();
     startPolling();
@@ -157,18 +181,60 @@
   }
 
   function updateRoomFoot() {
-    const room = $("room-select") ? $("room-select").value : "b1a";
-    const total = ROOM_TOTALS[room] || 12;
-    const el = $("room-total-seats");
-    if (el) el.textContent = total;
+    const code = $("room-select")?.value || "b1a", design = DESIGNS[code];
+    if (!design) return;
+    $("room-total-seats").textContent = ROOM_TOTALS[code];
+    $("room-headline").innerHTML = `${esc(design.name.split(" ")[0])} <em>Room</em>`;
+    $("room-description").textContent = design.description;
+    $("room-subtitle").textContent = design.subtitle;
+    $("map-room-title").textContent = design.name;
+    $("map-room-code").textContent = `${["b1a","b1b","b1c"].indexOf(code)+1} / 03`;
+    $("room-portal").style.setProperty("--room-accent",design.accent);
+    $("room-portal").style.setProperty("--room-glow",design.glow);
+    $("summary").style.setProperty("--room-accent",design.accent);
+    document.querySelectorAll("[data-room]").forEach(button => {
+      const active = button.dataset.room === code;
+      button.classList.toggle("is-active",active);
+      button.setAttribute("aria-pressed",String(active));
+    });
+  }
+
+  function resetInspector() {
+    $("seat-inspector").classList.add("hidden");
+    $("issue-form").classList.add("hidden");
+    $("issue-seat").value = "";
+    $("report-reveal").setAttribute("aria-expanded","false");
+    mapSignature = "";
+  }
+
+  function animateRoomSwitch() {
+    const viewport = $("scene-viewport");
+    viewport.classList.remove("room-travel");
+    void viewport.offsetWidth;
+    viewport.classList.add("room-travel");
+    const id = ++roomSwitchId;
+    window.setTimeout(() => { if (id === roomSwitchId) viewport.classList.remove("room-travel"); },840);
   }
 
   function updateAdminSeatOptions() {
-    const room = $("admin-room").value;
-    const count = ROOM_TOTALS[room] || 12;
-    $("admin-seat").innerHTML = Array.from({ length: count }, (_, i) =>
-      `<option value="${i + 1}">座位 ${String(i + 1).padStart(2, "0")}</option>`
-    ).join("");
+    const room = $("admin-room").value, count = ROOM_TOTALS[room] || 12;
+    $("admin-seat").innerHTML = Array.from({length:count},(_,i) =>
+      `<option value="${i+1}">${esc(DESIGNS[room]?.code||"")}${String(i+1).padStart(2,"0")}</option>`).join("");
+    updateAdminSeatState();
+  }
+
+  async function updateAdminSeatState() {
+    const id = ++adminSeatReadId, room = $("admin-room").value;
+    const no = Number($("admin-seat").value), status = $("admin-seat-status");
+    $("disable-seat").disabled = $("enable-seat").disabled = true;
+    if (!sb || !no) { status.textContent = "尚未載入座位資料"; return; }
+    status.textContent = "正在查詢座位狀態…";
+    const {data,error} = await sb.from("seats").select("id,is_active").eq("room_code",room).eq("seat_no",no).maybeSingle();
+    if (id !== adminSeatReadId) return;
+    if (error || !data) { status.textContent = "找不到此座位，請先執行座位增量SQL。"; return; }
+    status.textContent = data.is_active ? "目前狀態：已啟用" : "目前狀態：已停用";
+    $("disable-seat").disabled = !data.is_active;
+    $("enable-seat").disabled = data.is_active;
   }
 
   // --- 即時更新與輪詢 (Realtime & Polling) ---
@@ -986,24 +1052,17 @@
     await Promise.all([loadBlockedSlots(), refreshSeats()]);
   }
 
-  async function toggleSeat() {
-    if (profile?.role !== "librarian") {
-      notify("此功能僅限館員使用。");
-      return;
-    }
-    const room = $("admin-room").value, n = Number($("admin-seat").value);
-    const { data, error } = await sb.from("seats").select("id,is_active").eq("room_code", room).eq("seat_no", n).maybeSingle();
-    if (error || !data) {
-      notify(`找不到此座位（可能尚未執行增量 SQL 新增第 ${n} 席）。`);
-      return;
-    }
-    const { error: e } = await sb.from("seats").update({ is_active: !data.is_active }).eq("id", data.id);
-    if (e) {
-      notify("更新失敗，請確認館員權限。");
-      return;
-    }
-    notify(`座位 ${n} 已${data.is_active ? "停用" : "啟用"}。`);
-    refreshSeats();
+  async function setSeatActive(active) {
+    if (profile?.role !== "librarian") { notify("此功能僅限原型管理員使用。"); return; }
+    const room = $("admin-room").value, no = Number($("admin-seat").value);
+    const {data,error} = await sb.from("seats").select("id,is_active").eq("room_code",room).eq("seat_no",no).maybeSingle();
+    if (error || !data) { notify("找不到此座位，請確認SQL已更新。"); return; }
+    if (data.is_active === active) { notify("座位已經是該狀態。"); updateAdminSeatState(); return; }
+    const {data:changed,error:e} = await sb.from("seats").update({is_active:active})
+      .eq("id",data.id).eq("is_active",!active).select("id").maybeSingle();
+    if (e || !changed) { notify("更新失敗或狀態已改變，請重新整理。"); updateAdminSeatState(); return; }
+    notify(`${rooms[room]} ${String(no).padStart(2,"0")} 已${active?"啟用":"停用"}。`);
+    await Promise.all([updateAdminSeatState(),refreshSeats()]);
   }
 
   async function blockSlot() {
