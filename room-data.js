@@ -17,6 +17,32 @@
     equipment: equip(i)
   }));
 
+  const disciplineTables = [
+    { id: "c1", x: 29, y: 28, width: 38 },
+    { id: "c2", x: 75, y: 28, width: 38 },
+    { id: "c3", x: 29, y: 73, width: 38 },
+    { id: "c4", x: 75, y: 73, width: 38 }
+  ];
+  const disciplineSeats = disciplineTables.flatMap((table, group) => {
+    const stations = [
+      { dx: -13, dy: -12, side: "north", slot: 0 },
+      { dx: 0, dy: -12, side: "north", slot: 1 },
+      { dx: 13, dy: -12, side: "north", slot: 2 },
+      { dx: -8, dy: 11, side: "south", slot: 0 },
+      { dx: 8, dy: 11, side: "south", slot: 1 }
+    ];
+    return stations.map((station, index) => {
+      const no = group * 5 + index + 1;
+      return {
+        no, code: "C" + String(no).padStart(2, "0"),
+        x: table.x + station.dx, y: table.y + station.dy,
+        facing: station.side, side: station.side, slot: station.slot,
+        benchId: table.id, shape: "workbench",
+        equipment: ["power", "divider", ...(no % 4 === 1 ? ["lamp"] : []), ...(no % 5 === 3 ? ["monitor"] : [])]
+      };
+    });
+  });
+
   const data = {
     b1a: {
       code: "A", name: "Cozy Room", subtitle: "柔和光線 · 自在閱讀",
@@ -58,15 +84,9 @@
       description: "共享工作長桌與座位隔板，保留中央通行軸線。",
       accent: "#e4be8c", glow: "228,190,140", floor: "discipline",
       outline: "stepped", window: "left",
-      seats: locations([
-        [13,17],[29,16],[45,18],[21,39],[41,39],
-        [60,17],[77,16],[90,18],[68,39],[86,39],
-        [13,62],[29,62],[45,63],[21,85],[41,84],
-        [60,62],[77,62],[90,63],[68,85],[86,84]
-      ], "C", "workbench", i => ["power","divider", ...(i % 4 === 1 ? ["lamp"] : []), ...(i % 5 === 2 ? ["monitor"] : [])]),
+      seats: disciplineSeats,
       decor: [
-        {type:"workbench",x:29,y:29},{type:"workbench",x:76,y:29},
-        {type:"workbench",x:29,y:74},{type:"workbench",x:76,y:74},
+        ...disciplineTables.map(table => ({ ...table, type: "workbench" })),
         {type:"column",x:52,y:9},{type:"column",x:52,y:91},
         {type:"plant",x:6,y:48},{type:"plant",x:94,y:51},
         {type:"shelf",x:5,y:94}
