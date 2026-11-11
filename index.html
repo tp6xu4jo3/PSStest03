@@ -27,20 +27,9 @@
   </header>
 
   <main>
-    <section class="intro">
-      <div class="eyebrow"><span class="live-dot"></span> RESEARCH PROTOTYPE · NOT AN OFFICIAL SERVICE</div>
-      <div class="intro-row"><div><h1>讓專注，<em>有自己的空間。</em></h1><p>在三間不同性格的自習包廂之間，找到你的理想座位。</p></div><div class="date-stamp"><span>TAIPEI TIME</span><strong id="today-label">----</strong><small>GMT+8 · Asia/Taipei</small></div></div>
-    </section>
-
-    <section class="prototype-notice" aria-label="原型使用說明">
-      <strong>概念設計情境 · 非北科大圖書館官方服務</strong>
-      <p>設定為額外新建的A／B／C三間主題包廂自習室；平面配置、座位設備、預約狀態及畫面人物都是設計提案，並非館方真實資訊。座位登記與異常回報只寫入本原型資料庫。</p>
-    </section>
-
     <section id="booking-view" class="view">
       <div class="room-portal panel" id="room-portal">
         <div class="portal-copy">
-          <span class="eyebrow">THREE ROOMS · ONE FOCUS</span>
           <h2 id="room-headline">Cozy <em>Room</em></h2>
           <p id="room-description">像自己的閱讀角落，木質桌面、綠意與柔和光線構成安靜的包廂。</p>
           <span id="room-subtitle" class="room-subtitle">溫柔明亮・留一點餘裕</span>
@@ -52,11 +41,13 @@
             <button class="room-tab" type="button" data-room="b1b" aria-pressed="false"><span class="room-letter">B</span><span><strong>Sleepy</strong><small>沉靜思緒</small></span></button>
             <button class="room-tab" type="button" data-room="b1c" aria-pressed="false"><span class="room-letter">C</span><span><strong>Discipline</strong><small>高度專注</small></span></button>
           </div>
+          <select id="room-select" hidden aria-hidden="true" tabindex="-1">
+            <option value="b1a">Cozy</option><option value="b1b">Sleepy</option><option value="b1c">Discipline</option>
+          </select>
         </div>
       </div>
 
       <div class="controls panel controls-compact">
-        <label class="room-select-control">包廂<select id="room-select"><option value="b1a">A · Cozy Room</option><option value="b1b">B · Sleepy Room</option><option value="b1c">C · Discipline Room</option></select></label>
         <label>日期<input id="date-select" type="date"></label>
         <label>時段<select id="slot-select"></select></label>
         <label class="filter-toggle"><input id="bookable-only" type="checkbox" disabled><span>凸顯可選座位</span></label>
@@ -65,10 +56,6 @@
 
       <div class="workspace experience-grid">
         <section class="map-panel panel">
-          <div class="section-heading room-map-heading">
-            <div><span class="eyebrow">ISOMETRIC ROOM EXPLORER / B1</span><h2><span id="map-room-title">Cozy Room</span> <small id="map-room-code">01 / 03</small></h2></div>
-            <span class="floor-tag">2.5D · 斜角空拍</span>
-          </div>
           <div class="legend">
             <span><i class="key available"></i>可登記</span>
             <span><i class="key booked"></i>已登記</span>
@@ -79,15 +66,13 @@
             <div class="scene-stage">
               <div class="floorplan" id="floorplan" aria-label="包廂座位互動模型"><div class="loading">正在建立房間…</div></div>
             </div>
-            <span class="scene-compass" aria-hidden="true">N / 45°</span>
-            <span class="scene-note">人物為動態裝飾，已登記不等於現場有人</span>
           </div>
           <div id="empty-state" class="empty-state hidden" role="status"><p id="empty-message"></p><button id="clear-filter" class="secondary-button" type="button">清除篩選</button></div>
-          <div class="map-foot"><span>點選任一座位查看設備、狀態與回報功能</span><span>本包廂座位 <b id="room-total-seats">12</b> 席</span></div>
+          <div class="map-foot"><span>座位 <b id="room-total-seats">12</b> 席</span></div>
         </section>
 
         <aside class="summary panel" id="summary">
-          <div class="inspector-top"><span class="eyebrow">SEAT CONCIERGE</span><span class="inspector-marker">● DETAILS</span></div>
+          <div class="inspector-top"><span class="eyebrow">SEAT DETAILS</span></div>
           <h2>座位詳情</h2>
           <div class="summary-seat"><span>選取座位</span><strong id="sum-seat">尚未選位</strong><div id="sum-features" class="summary-features"></div></div>
           <dl><div><dt>包廂</dt><dd id="sum-room">A · Cozy Room</dd></div><div><dt>特色配置</dt><dd id="sum-zone">—</dd></div><div><dt>日期</dt><dd id="sum-date">—</dd></div><div><dt>時段</dt><dd id="sum-slot">—</dd></div></dl>
@@ -99,12 +84,10 @@
               <label>問題類型<select id="issue-type" required><option value="occupied">現場有人占位</option><option value="equipment">設備異常</option><option value="mismatch">狀態與現場不符</option><option value="other">其他問題</option></select></label>
               <label>補充說明（選填）<textarea id="issue-details" maxlength="300" rows="3" placeholder="簡述狀況，不要提供姓名、學號或個資。"></textarea></label>
               <button type="submit" id="issue-submit" class="secondary-button">送出原型回報</button>
-              <small class="fineprint">僅為原型紀錄，不會通知館方。</small>
             </form>
           </div>
           <p class="hint" id="summary-hint">點選地圖上的座位，即可查看設備與狀態。</p>
           <button id="confirm-booking" class="primary-button" disabled>確認模擬登記 <span>↗</span></button>
-          <small class="fineprint">僅供互動展示，不代表北科大真實座位登記。</small>
         </aside>
       </div>
     </section>
@@ -142,7 +125,7 @@
     </section>
   </main>
 
-  <footer><span>北科大 B1 自習室｜教學研究原型</span><span>NOT AFFILIATED WITH THE LIBRARY</span><span>© <span id="year"></span> SEAT SERVICE CONCEPT</span></footer>
+  <footer><span>北科大包廂自習室</span><span>設計原型，非圖書館官方系統</span></footer>
 
   <div id="auth-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title">
     <div class="modal-card panel"><button class="modal-close" id="auth-close" aria-label="關閉">×</button><span class="eyebrow">MEMBER ACCESS</span><h2 id="auth-title">原型測試帳號</h2><p class="modal-desc">僅供教學模擬，請勿輸入真實學號或慣用密碼；帳號並不驗證北科大身分。</p>
