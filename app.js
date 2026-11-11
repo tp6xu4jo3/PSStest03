@@ -516,14 +516,9 @@
 
       seatView = newSeatView;
 
-      // 如果更新後發現目前選中的座位已被搶訂或封鎖，取消選取並提示重選
-      if (selectedSeat) {
-        const currentSeatObj = seatView.seats.find(s => s.id === selectedSeat);
-        const stillBookable = currentSeatObj && isBookable(currentSeatObj, seatView);
-        if (!stillBookable) {
-          selectedSeat = null;
-          notify("您先前選取的座位已被其他讀者預約，請重新選位。");
-        }
+      if (selectedSeat && !seatView.seats.some(s => s.id === selectedSeat)) {
+        selectedSeat = null;
+        resetInspector();
       }
 
       renderMap();
@@ -560,147 +555,148 @@
     $("empty-message").textContent = message;
   }
 
-  // 原型示意配置：不宣稱是真實館內平面圖或實際座號。
+  // 輕量2.5D地圖。人物僅為視覺動畫：已登記不代表現場有人。
   function renderMap() {
     const map = $("floorplan");
     if (!seatView) { showEmpty(""); return; }
     const { room, seats, bookedSet, isBlocked } = seatView;
-    const total = seats.length;
-    const available = bookableSeats().length;
-    $("availability-count").textContent = isBlocked
-      ? "此模擬時段已封鎖"
-      : `示範可選 ${available} / ${total} 席（非即時館方資訊）`;
-    map.innerHTML = "";
-    if (!total) {
-      showEmpty("本區尚未建立示範座位。請管理者先執行 Supabase 增量 SQL。");
-      syncIssueSeatOptions();
-      return;
+    const design = DESIGNS[room];
+    if (!design) return;
+    const expected = ROOM_TOTALS[room];
+    const available = bookableSeats().length, totalActive = seats.filter(s=>s.is_active).length;
+    $("availability-count").textContent = isBlocked ? "這個時段已封鎖"
+      : `可登記 ${available} / ${totalActive} 席 · 原型資料`;
+    showEmpty(seats.length < expected ? `本包廂已載入 ${seats.length}/${expected} 席，請執行新增座位SQL。` : "");
+    const fingerprint = JSON.stringify([room,isBlocked,seats.map(s=>[s.id,s.seat_no,s.is_active]),
+      [...bookedSet].sort(),selectedSeat,$("bookable-only").checked]);
+    if (mapSignature === fingerprint && mapRoom === room) return;
+    const roomChanged = mapRoom !== room;
+    mapSignature = fingerprint;
+    mapRoom = room;
+
+    const world = document.createElement("div");
+    world.className = `iso-room iso-${design.floor} ${roomChanged ? "scene-enter" : ""}`;
+    world.style.setProperty("--scene-accent",design.accent);
+    world.style.setProperty("--scene-glow",design.glow);
+    world.innerHTML = `
+      <div class="room-base"></div>
+      <div class="room-wall wall-top"><span>WINDOW · ${esc(design.name)}</span></div>
+      <div class="room-wall wall-left"></div>
+      <div class="room-wall wall-right"></div>
+      <div class="room-wall wall-bottom"><span>ENTRANCE</span></div>
+      <div class="room-window"><i></i><i></i><i></i><i></i></div>
+      <div class="floor-grid" aria-hidden="true"></div>
+      <div class="room-door" aria-hidden="true"><span>入口</span><i></i></div>
+      <div class="room-furniture" aria-hidden="true"></div>
+      <div class="room-seat-layer"></div>
+      <div class="room-people" aria-hidden="true"></div>`;
+
+    const props = world.querySelector(".room-furniture");
+    for (const item of design.decor || []) {
+      const element = document.createElement("span");
+      element.className = `room-prop prop-${item.type}`;
+      element.style.left = `${item.x}%`;
+      element.style.top = `${item.y}%`;
+      element.innerHTML = item.type === "plant" ? '<i class="prop-leaf"></i><i class="prop-pot"></i>'
+        : item.type === "sofa" ? '<i class="prop-sofa"></i>' : '<i class="prop-shelf"></i>';
+      props.appendChild(element);
     }
-    const wrapper = document.createElement("div");
-    wrapper.className = "ntut-demo-map";
-    const title = document.createElement("div");
-    title.className = "ntut-map-caption";
-    title.innerHTML = `<strong>${esc(rooms[room] || "B1 示範區")}</strong><span>示意排列 · 非官方平面圖</span>`;
-    wrapper.appendChild(title);
-    const grid = document.createElement("div");
-    grid.className = "ntut-seat-grid";
-    for (const seat of seats) {
-      grid.appendChild(createSeatButton(seat.seat_no, room, seats, bookedSet, isBlocked, $("bookable-only").checked));
+
+    const registered = new Map(seats.map(s=>[s.seat_no,s]));
+    const layer = world.querySelector(".room-seat-layer");
+    for (const place of design.seats) {
+      layer.appendChild(createSeatButton(place,registered.get(place.no),bookedSet,isBlocked,$("bookable-only").checked,room));
     }
-    wrapper.appendChild(grid);
-    map.appendChild(wrapper);
-    syncIssueSeatOptions();
-    showEmpty(available ? "" : isBlocked
-      ? "此模擬時段已封鎖。"
-      : "這個模擬時段目前沒有可登記座位，請選擇其他時段。");
+    const pedestrians = world.querySelector(".room-people");
+    for (const walker of design.walkers) {
+      const figure = document.createElement("div");
+      figure.className = `visitor visitor-${walker.path}`;
+      figure.style.cssText = `left:${walker.x}%;top:${walker.y}%;animation-delay:${walker.delay}s`;
+      figure.innerHTML = '<i class="person-head"></i><i class="person-body"></i><i class="person-shadow"></i>';
+      pedestrians.appendChild(figure);
+    }
+    map.replaceChildren(world);
   }
 
-  function syncIssueSeatOptions() {
-    const select = $("issue-seat");
-    if (!select) return;
-    const previous = select.value;
-    const availableSeats = seatView?.seats || [];
-    select.innerHTML = '<option value="">請選擇示範座位</option>'
-      + availableSeats.map(s => `<option value="${esc(s.id)}">座位 ${String(s.seat_no).padStart(2, "0")}</option>`).join("");
-    if (availableSeats.some(s => s.id === previous)) select.value = previous;
-  }
-
-  function createSeatButton(no, room, dbSeats, bookedSet, isBlocked, bookableOnly) {
-    const cfg = getSeatConfig(room, no);
-    const seatInDb = dbSeats.find(s => s.seat_no === no);
-    const isRegistered = !!seatInDb;
-    const isActive = isRegistered ? seatInDb.is_active : false;
-    const isBooked = isRegistered ? bookedSet.has(seatInDb.id) : false;
-    const bookable = isRegistered && isActive && !isBooked && !isBlocked;
-    const selected = isRegistered && selectedSeat === seatInDb.id;
-
-    const label = !isRegistered ? "待同步" : !isActive ? "停用" : isBlocked ? "封鎖" : isBooked ? "已預約" : "空位";
-
+  function createSeatButton(place,seat,bookedSet,isBlocked,filter,room) {
+    const cfg = getSeatConfig(room,place.no);
+    const booked = seat && bookedSet.has(seat.id);
+    const canBook = !!seat && seat.is_active && !booked && !isBlocked;
+    const selected = seat && selectedSeat === seat.id;
+    const status = !seat ? "待新增" : !seat.is_active ? "已停用" : isBlocked ? "時段封鎖" : booked ? "已登記" : "可登記";
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "seat";
-
-    if (!isRegistered) btn.classList.add("unregistered-seat");
-    else if (!isActive || isBlocked) btn.classList.add("disabled-seat");
-    else if (isBooked) btn.classList.add("booked");
-
-    if (selected) btn.classList.add("selected");
-    btn.classList.toggle("dimmed", bookableOnly && !bookable);
-    btn.disabled = !bookable;
-
-    btn.setAttribute("aria-pressed", String(selected));
-    btn.setAttribute("aria-label", `座位 ${String(no).padStart(2, "0")}，${cfg.zone}，${label}，${cfg.features.join(" ")}`);
-
-    const chipsHtml = cfg.features.map(f => `<span class="chip">${f}</span>`).join("");
-
+    btn.className = "seat-object " +
+      (!seat ? "seat-missing" : !seat.is_active||isBlocked ? "seat-offline" : booked ? "seat-occupied" : "seat-open") +
+      (selected?" is-selected":"") + (filter && !canBook?" is-dimmed":"");
+    btn.style.left = `${place.x}%`;
+    btn.style.top = `${place.y}%`;
+    btn.setAttribute("aria-label",`${cfg.code}，${status}，配備：${cfg.features.join("、")||"標準座位"}`);
+    btn.setAttribute("aria-pressed",String(!!selected));
+    const icons = place.equipment.slice(0,3).map(k =>
+      `<span class="desk-equipment" title="${esc(EQUIPMENT[k]?.label||k)}">${esc(EQUIPMENT[k]?.mark||"•")}</span>`).join("");
     btn.innerHTML = `
-      <div class="seat-header">
-        <strong class="seat-num">${String(no).padStart(2, "0")}</strong>
-        <span class="seat-tag">${cfg.tag}</span>
-      </div>
-      <div class="seat-status-bar">
-        <span class="status-dot"></span>
-        <span class="status-text">${label}</span>
-      </div>
-      <div class="seat-feature-chips">
-        ${chipsHtml}
-      </div>
-    `;
-
+      <span class="seat-model" aria-hidden="true">
+        <span class="desk-edge"></span>
+        <span class="desk-surface"><span class="desk-lamp"></span><span class="desk-gear">${icons}</span></span>
+        <span class="seat-chair"><span class="chair-back"></span><span class="chair-cushion"></span></span>
+        ${booked ? '<span class="desk-reader"><i class="person-head"></i><i class="person-body"></i></span>' : ""}
+      </span>
+      <span class="seat-label">${esc(cfg.code)}</span><span class="seat-point"></span>`;
     btn.onclick = () => {
-      if (!isRegistered) {
-        notify("此座位增量資料尚未同步至資料庫，請由館員執行 setup_incremental_seats.sql。");
-        return;
-      }
-      if (!session) {
-        openAuth();
-        notify("請先登入，再選擇座位。");
-        return;
-      }
-      selectedSeat = seatInDb.id;
+      if (!seat) { notify("座位資料尚未建立。請管理者執行新增包廂SQL。"); return; }
+      const was = selectedSeat;
+      selectedSeat = seat.id;
+      if (was !== seat.id) $("issue-form").classList.add("hidden");
+      $("report-reveal").setAttribute("aria-expanded","false");
       renderMap();
       updateSummary();
+      if (window.matchMedia("(max-width: 860px)").matches) {
+        $("summary").scrollIntoView({behavior:"smooth",block:"nearest"});
+      }
     };
-
     return btn;
   }
 
   // --- 預約摘要面板更新 ---
   function updateSummary() {
-    const room = $("room-select").value;
-    const date = $("date-select").value;
-    const time = $("slot-select").value;
-    const seat = seatView && selectedSeat ? seatView.seats.find(s => s.id === selectedSeat) : null;
-    const cfg = seat ? getSeatConfig(room, seat.seat_no) : null;
-
-    let hint = "選擇示範空位，進行模擬登記。";
-    if (!session) hint = "登入測試帳號後才能模擬登記。";
-    else if (seat) hint = "確認示範資料無誤後送出模擬登記。";
-    else if (seatView && !bookableSeats().length) hint = "此時段已無可預約座位，請換個時段。";
-
-    $("sum-seat").textContent = seat ? `座位 ${String(seat.seat_no).padStart(2, "0")}` : "尚未選位";
-    $("sum-room").textContent = rooms[room];
+    const room = $("room-select").value,date = $("date-select").value,time = $("slot-select").value;
+    const seat = seatView && selectedSeat ? seatView.seats.find(s=>s.id === selectedSeat) : null;
+    const cfg = seat ? getSeatConfig(room,seat.seat_no) : null;
+    const canBook = !!session && !!seat && isBookable(seat,seatView);
+    $("sum-seat").textContent = cfg ? cfg.code : "尚未選位";
+    $("sum-room").textContent = rooms[room] || "—";
     $("sum-zone").textContent = cfg ? cfg.zone : "—";
     $("sum-date").textContent = date || "—";
-    $("sum-slot").textContent = time ? `${time}–${String(Number(time.slice(0, 2)) + 1).padStart(2, "0")}:00` : "—";
-
-    const featuresContainer = $("sum-features");
-    if (featuresContainer) {
-      if (cfg && cfg.features.length) {
-        featuresContainer.innerHTML = cfg.features.map(f => `<span class="chip">${f}</span>`).join("");
-      } else {
-        featuresContainer.innerHTML = "";
-      }
+    $("sum-slot").textContent = time ? `${time}–${String(Number(time.slice(0,2))+1).padStart(2,"0")}:00` : "—";
+    $("sum-features").innerHTML = cfg && cfg.equipment.length
+      ? cfg.equipment.map(k=>`<span class="feature-badge"><b>${esc(EQUIPMENT[k]?.mark||"•")}</b>${esc(EQUIPMENT[k]?.label||k)}</span>`).join("")
+      : '<span class="feature-placeholder">點選座位查看設備</span>';
+    $("seat-inspector").classList.toggle("hidden",!seat);
+    if (seat) {
+      const booked = seatView.bookedSet.has(seat.id);
+      const status = !seat.is_active ? "座位停用" : seatView.isBlocked ? "時段封鎖" : booked ? "已登記" : "可登記";
+      $("inspection-status").textContent = status;
+      $("inspection-status").dataset.status = !seat.is_active||seatView.isBlocked ? "offline" : booked ? "booked" : "available";
+      $("inspection-code").textContent = cfg.code;
+      $("issue-seat").value = seat.id;
+    } else {
+      $("issue-seat").value = "";
+      $("issue-form").classList.add("hidden");
     }
-
-    $("confirm-booking").disabled = !seat || !session;
-    $("summary-hint").textContent = hint;
+    $("confirm-booking").disabled = !canBook;
+    $("summary-hint").textContent = !seat
+      ? "點選房間座位，查看設備、狀態與回報。"
+      : !session ? "登入後可登記或回報此座位。"
+      : !canBook ? "目前不可登記，但仍可回報現場異常。"
+      : "座位可登記，確認後加入模擬預約。";
   }
 
   // --- 送出預約 ---
   async function book() {
-    if (!session || !selectedSeat) {
-      notify("請先登入並選擇空位。");
+    const seat = seatView?.seats.find(s => s.id === selectedSeat);
+    if (!session || !seat || !isBookable(seat, seatView)) {
+      notify("請先登入並選擇可登記的座位。");
       return;
     }
     const btn = $("confirm-booking");
@@ -1109,6 +1105,8 @@
       });
       if (error) throw error;
       $("issue-details").value = "";
+      $("issue-form").classList.add("hidden");
+      $("report-reveal").setAttribute("aria-expanded","false");
       notify("模擬回報已記錄；不會送至北科大圖書館。");
     } catch (err) {
       console.error(err);
