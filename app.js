@@ -8,13 +8,13 @@
   const ROOM_TOTALS = Object.fromEntries(Object.entries(DESIGNS).map(([key,room]) => [key,room.seats.length]));
 
   // 示範座位僅使用測試編號；不捏造館方真實座位排列與設備配置。
-  let sb, session = null, profile = null, selectedSeat = null, seatView = null;
+  let sb, session = null, profile = null, selectedSeat = null, selectedPreviewNo = null, seatView = null;
   let currentAuth = "login", toastTimer, currentView = "booking";
   let currentQueryId = 0; // 查詢防競爭識別碼
   let realtimeChannel = null, pollingTimer = null, remoteDebounceTimer = null;
   let cachedReservations = [];
   let adminLoadId = 0, filteredAdminReservations = [];
-  let mapSignature = "", mapRoom = null, roomSwitchId = 0, adminSeatReadId = 0;
+  let mapRoom = null, roomSwitchId = 0, adminSeatReadId = 0;
 
   // --- 台北時區處理 ---
   function getTaipeiDateTime() {
@@ -83,8 +83,6 @@
 
   // --- 初始化流程 ---
   function init() {
-    $("year").textContent = new Date().getFullYear();
-    $("today-label").textContent = localDate().replaceAll("-", ".");
     $("date-select").min = shiftDate(0);
     $("date-select").max = shiftDate(7);
     $("date-select").value = shiftDate(0);
@@ -188,8 +186,6 @@
     $("room-headline").innerHTML = `${esc(design.name.split(" ")[0])} <em>Room</em>`;
     $("room-description").textContent = design.description;
     $("room-subtitle").textContent = design.subtitle;
-    $("map-room-title").textContent = design.name;
-    $("map-room-code").textContent = `${["b1a","b1b","b1c"].indexOf(code)+1} / 03`;
     $("room-portal").style.setProperty("--room-accent",design.accent);
     $("room-portal").style.setProperty("--room-glow",design.glow);
     $("summary").style.setProperty("--room-accent",design.accent);
@@ -205,7 +201,7 @@
     $("issue-form").classList.add("hidden");
     $("issue-seat").value = "";
     $("report-reveal").setAttribute("aria-expanded","false");
-    mapSignature = "";
+    selectedPreviewNo = null;
   }
 
   function animateRoomSwitch() {
@@ -281,7 +277,7 @@
     const date = $("date-select").value;
 
     $("availability-count").textContent = "正在搜尋示範時段…";
-    $("floorplan").innerHTML = '<div class="loading">正在讀取示範時段…</div>';
+    if (!$("floorplan").querySelector(".iso-room")) $("floorplan").innerHTML = '<div class="loading">正在讀取時段…</div>';
     showEmpty("");
     $("confirm-booking").disabled = true;
 
@@ -480,7 +476,7 @@
 
     if (!date || !time) {
       if (!isBackground) {
-        $("floorplan").innerHTML = '<div class="loading">請先選擇日期與時段，即可查看座位。</div>';
+        if (!$("floorplan").querySelector(".iso-room")) $("floorplan").innerHTML = '<div class="loading">請先選擇日期與時段。</div>';
         $("availability-count").textContent = "請選擇日期與時段";
         showEmpty("");
       }
@@ -488,7 +484,7 @@
     }
 
     if (!isBackground) {
-      $("floorplan").innerHTML = '<div class="loading">正在讀取座位資料…</div>';
+      if (!$("floorplan").querySelector(".iso-room")) $("floorplan").innerHTML = '<div class="loading">正在讀取座位資料…</div>';
     }
 
     if (!sb) return;
@@ -517,9 +513,9 @@
 
       seatView = newSeatView;
 
-      if (selectedSeat && !seatView.seats.some(s => s.id === selectedSeat)) {
-        selectedSeat = null;
-        resetInspector();
+      if (selectedPreviewNo !== null) {
+        const refreshed = seatView.seats.find(s => s.seat_no === selectedPreviewNo);
+        selectedSeat = refreshed?.id || null;
       }
 
       renderMap();
@@ -704,37 +700,47 @@
 
 
   // --- 預約摘要面板更新 ---
+
   function updateSummary() {
-    const room = $("room-select").value,date = $("date-select").value,time = $("slot-select").value;
-    const seat = seatView && selectedSeat ? seatView.seats.find(s=>s.id === selectedSeat) : null;
-    const cfg = seat ? getSeatConfig(room,seat.seat_no) : null;
-    const canBook = !!session && !!seat && isBookable(seat,seatView);
-    $("sum-seat").textContent = cfg ? cfg.code : "尚未選位";
+    const room = $("room-select").value;
+    const date = $("date-select").value;
+    const time = $("slot-select").value;
+    const seat = seatView?.seats.find(item => item.id === selectedSeat) || null;
+    const seatNo = selectedPreviewNo ?? seat?.seat_no;
+    const config = seatNo ? getSeatConfig(room, seatNo) : null;
+    const canBook = !!session && !!seat && isBookable(seat, seatView);
+    $("sum-seat").textContent = config?.code || "尚未選位";
     $("sum-room").textContent = rooms[room] || "—";
-    $("sum-zone").textContent = cfg ? cfg.zone : "—";
+    $("sum-zone").textContent = config?.zone || "—";
     $("sum-date").textContent = date || "—";
-    $("sum-slot").textContent = time ? `${time}–${String(Number(time.slice(0,2))+1).padStart(2,"0")}:00` : "—";
-    $("sum-features").innerHTML = cfg && cfg.equipment.length
-      ? cfg.equipment.map(k=>`<span class="feature-badge"><b>${esc(EQUIPMENT[k]?.mark||"•")}</b>${esc(EQUIPMENT[k]?.label||k)}</span>`).join("")
-      : '<span class="feature-placeholder">點選座位查看設備</span>';
-    $("seat-inspector").classList.toggle("hidden",!seat);
-    if (seat) {
-      const booked = seatView.bookedSet.has(seat.id);
-      const status = !seat.is_active ? "座位停用" : seatView.isBlocked ? "時段封鎖" : booked ? "已登記" : "可登記";
+    $("sum-slot").textContent = time
+      ? `${time}–${String(Number(time.slice(0, 2)) + 1).padStart(2, "0")}:00` : "—";
+    $("sum-features").innerHTML = config?.equipment.length
+      ? config.equipment.map(key => `<span class="feature-badge"><b>${esc(EQUIPMENT[key]?.mark || "•")}</b>${esc(EQUIPMENT[key]?.label || key)}</span>`).join("")
+      : "";
+
+    $("seat-inspector").classList.toggle("hidden", !config);
+    if (config) {
+      const booked = !!seat && seatView.bookedSet.has(seat.id);
+      const status = !seat ? "未建置" : !seat.is_active ? "停用"
+        : seatView.isBlocked ? "時段封鎖" : booked ? "已登記" : "可登記";
       $("inspection-status").textContent = status;
-      $("inspection-status").dataset.status = !seat.is_active||seatView.isBlocked ? "offline" : booked ? "booked" : "available";
-      $("inspection-code").textContent = cfg.code;
-      $("issue-seat").value = seat.id;
+      $("inspection-status").dataset.status = !seat || !seat.is_active || seatView.isBlocked
+        ? "offline" : booked ? "booked" : "available";
+      $("inspection-code").textContent = config.code;
+      $("issue-seat").value = seat?.id || "";
+      $("report-reveal").classList.toggle("hidden", !seat);
+      if (!seat) $("issue-form").classList.add("hidden");
     } else {
       $("issue-seat").value = "";
       $("issue-form").classList.add("hidden");
     }
     $("confirm-booking").disabled = !canBook;
-    $("summary-hint").textContent = !seat
-      ? "點選房間座位，查看設備、狀態與回報。"
-      : !session ? "登入後可登記或回報此座位。"
-      : !canBook ? "目前不可登記，但仍可回報現場異常。"
-      : "座位可登記，確認後加入模擬預約。";
+    $("summary-hint").textContent = !config ? "點選座位查看資訊。"
+      : !seat ? "此座位尚未建置，需完成資料庫更新。"
+      : !session ? "登入後可登記或回報。"
+      : !canBook ? "此座位目前不可登記，仍可回報問題。"
+      : "確認後即可登記。";
   }
 
   // --- 送出預約 ---
@@ -754,11 +760,13 @@
       });
       if (error) throw error;
       selectedSeat = null;
+      selectedPreviewNo = null;
       notify("模擬登記完成，已加入我的登記；不代表校方座位。");
       await refreshSeats();
     } catch (e) {
       console.error(e);
       selectedSeat = null;
+      selectedPreviewNo = null;
       notify(e.message?.includes("SLOT_TAKEN")
         ? "手慢了一步，座位剛被其他讀者預約，請重新選位。"
         : e.message?.includes("SLOT_BLOCKED")
