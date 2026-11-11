@@ -396,7 +396,7 @@ button:active:not(:disabled){transform:translateY(2px) scale(.985)}
 .iso-discipline .prop-bench-top::before{content:"";position:absolute;top:49%;left:1%;right:1%;height:3px;background:#52686b;box-shadow:0 1px 0 #dbe0d1}
 .iso-discipline .prop-bench-support{left:6%;right:6%;bottom:8%;height:7px;border-radius:2px;background:#435a5d}
 .iso-discipline .bench-places{position:absolute;left:2%;right:2%;top:6%;bottom:22%;z-index:3}
-.iso-discipline .bench-place{position:absolute;left:calc(var(--station-slot)*100%/var(--station-count));width:calc(100%/var(--station-count));height:50%;border-right:2px solid #60747480;background:transparent;transition:background-color .2s ease;box-sizing:border-box}
+.iso-discipline .bench-place{position:absolute;height:50%;border-right:2px solid #60747480;background:transparent;transition:background-color .2s ease;box-sizing:border-box}
 .iso-discipline .bench-north{top:0}
 .iso-discipline .bench-south{top:50%;border-top:1px solid #6c8587}
 .iso-discipline .bench-place:last-child{border-right:0}
