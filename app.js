@@ -556,109 +556,152 @@
     $("empty-message").textContent = message;
   }
 
-  // 輕量2.5D地圖。人物僅為視覺動畫：已登記不代表現場有人。
+
   function renderMap() {
     const map = $("floorplan");
     if (!seatView) { showEmpty(""); return; }
-    const { room, seats, bookedSet, isBlocked } = seatView;
+    const { room, seats, isBlocked } = seatView;
     const design = DESIGNS[room];
     if (!design) return;
-    const expected = ROOM_TOTALS[room];
-    const available = bookableSeats().length, totalActive = seats.filter(s=>s.is_active).length;
-    $("availability-count").textContent = isBlocked ? "這個時段已封鎖"
-      : `可登記 ${available} / ${totalActive} 席 · 原型資料`;
-    showEmpty(seats.length < expected ? `本包廂已載入 ${seats.length}/${expected} 席，請執行新增座位SQL。` : "");
-    const fingerprint = JSON.stringify([room,$("date-select").value,$("slot-select").value,
-      isBlocked,seats.map(s=>[s.id,s.seat_no,s.is_active]),
-      [...bookedSet].sort(),selectedSeat,$("bookable-only").checked]);
-    if (mapSignature === fingerprint && mapRoom === room && map.querySelector(".iso-room")) return;
-    const roomChanged = mapRoom !== room;
-    mapSignature = fingerprint;
-    mapRoom = room;
 
+    const available = bookableSeats().length;
+    const activeCount = seats.filter(seat => seat.is_active).length;
+    $("availability-count").textContent = isBlocked ? "此時段已封鎖" : `可登記 ${available} / ${activeCount} 席`;
+    const expected = ROOM_TOTALS[room];
+    showEmpty(seats.length < expected
+      ? `尚有 ${expected - seats.length} 席未建置；可先查看配置，完成資料庫更新後才能登記。` : "");
+
+    if (mapRoom !== room || !map.querySelector(".iso-room")) {
+      buildRoomScene(map, room, design);
+      mapRoom = room;
+    }
+    updateSeatNodes();
+  }
+
+  function buildRoomScene(map, room, design) {
     const world = document.createElement("div");
-    world.className = `iso-room iso-${design.floor} ${roomChanged ? "scene-enter" : ""}`;
-    world.style.setProperty("--scene-accent",design.accent);
-    world.style.setProperty("--scene-glow",design.glow);
+    world.className = `iso-room iso-${design.floor} iso-outline-${design.outline} iso-window-${design.window} scene-enter`;
+    world.style.setProperty("--scene-accent", design.accent);
+    world.style.setProperty("--scene-glow", design.glow);
     world.innerHTML = `
-      <div class="room-base"></div>
-      <div class="room-wall wall-top"><span>WINDOW · ${esc(design.name)}</span></div>
-      <div class="room-wall wall-left"></div>
-      <div class="room-wall wall-right"></div>
-      <div class="room-wall wall-bottom"><span>ENTRANCE</span></div>
-      <div class="room-window"><i></i><i></i><i></i><i></i></div>
-      <div class="floor-grid" aria-hidden="true"></div>
-      <div class="room-door" aria-hidden="true"><span>入口</span><i></i></div>
+      <div class="room-base"></div><div class="floor-grid" aria-hidden="true"></div>
+      <div class="room-wall wall-top"></div><div class="room-wall wall-left"></div>
+      <div class="room-wall wall-right"></div><div class="room-wall wall-bottom"></div>
+      <div class="room-window"><i></i><i></i><i></i></div>
+      <div class="room-door" aria-hidden="true"></div>
       <div class="room-furniture" aria-hidden="true"></div>
       <div class="room-seat-layer"></div>
       <div class="room-people" aria-hidden="true"></div>`;
-
-    const props = world.querySelector(".room-furniture");
-    for (const item of design.decor || []) {
-      const element = document.createElement("span");
-      element.className = `room-prop prop-${item.type}`;
-      element.style.left = `${item.x}%`;
-      element.style.top = `${item.y}%`;
-      element.innerHTML = item.type === "plant" ? '<i class="prop-leaf"></i><i class="prop-pot"></i>'
-        : item.type === "sofa" ? '<i class="prop-sofa"></i>' : '<i class="prop-shelf"></i>';
-      props.appendChild(element);
+    const furniture = world.querySelector(".room-furniture");
+    for (const decor of design.decor) {
+      const item = document.createElement("span");
+      item.className = `room-prop prop-${decor.type}`;
+      item.style.left = `${decor.x}%`;
+      item.style.top = `${decor.y}%`;
+      if (decor.type === "plant") item.innerHTML = '<i class="prop-leaf"></i><i class="prop-pot"></i>';
+      else if (decor.type === "column") item.innerHTML = '<i class="prop-column"></i>';
+      else if (decor.type === "workbench") item.innerHTML = '<i class="prop-bench-top"></i><i class="prop-bench-support"></i>';
+      else item.innerHTML = '<i></i>';
+      furniture.appendChild(item);
     }
 
-    const registered = new Map(seats.map(s=>[s.seat_no,s]));
     const layer = world.querySelector(".room-seat-layer");
-    for (const place of design.seats) {
-      layer.appendChild(createSeatButton(place,registered.get(place.no),bookedSet,isBlocked,$("bookable-only").checked,room));
-    }
-    const pedestrians = world.querySelector(".room-people");
+    for (const place of design.seats) layer.appendChild(createSeatButton(place, room));
+
+    const people = world.querySelector(".room-people");
     for (const walker of design.walkers) {
-      const figure = document.createElement("div");
-      figure.className = `visitor visitor-${walker.path}`;
-      figure.style.cssText = `left:${walker.x}%;top:${walker.y}%;animation-delay:${walker.delay - Math.random() * 6}s`;
-      figure.innerHTML = '<i class="person-head"></i><i class="person-body"></i><i class="person-shadow"></i>';
-      pedestrians.appendChild(figure);
+      const person = document.createElement("div");
+      person.className = "visitor";
+      person.style.left = `${walker.x}%`;
+      person.style.top = `${walker.y}%`;
+      person.style.setProperty("--walk-x", `${walker.dx}px`);
+      person.style.setProperty("--walk-y", `${walker.dy}px`);
+      person.style.animationDelay = `${walker.delay - Math.random() * 4}s`;
+      person.innerHTML = '<i class="person-head"></i><i class="person-body"></i><i class="person-shadow"></i>';
+      people.appendChild(person);
     }
     map.replaceChildren(world);
   }
 
-  function createSeatButton(place,seat,bookedSet,isBlocked,filter,room) {
-    const cfg = getSeatConfig(room,place.no);
-    const booked = seat && bookedSet.has(seat.id);
-    const canBook = !!seat && seat.is_active && !booked && !isBlocked;
-    const selected = seat && selectedSeat === seat.id;
-    const status = !seat ? "待新增" : !seat.is_active ? "已停用" : isBlocked ? "時段封鎖" : booked ? "已登記" : "可登記";
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "seat-object " +
-      (!seat ? "seat-missing" : !seat.is_active||isBlocked ? "seat-offline" : booked ? "seat-occupied" : "seat-open") +
-      (selected?" is-selected":"") + (filter && !canBook?" is-dimmed":"");
-    btn.style.left = `${place.x}%`;
-    btn.style.top = `${place.y}%`;
-    btn.setAttribute("aria-label",`${cfg.code}，${status}，配備：${cfg.features.join("、")||"標準座位"}`);
-    btn.setAttribute("aria-pressed",String(!!selected));
-    const icons = place.equipment.slice(0,3).map(k =>
-      `<span class="desk-equipment" title="${esc(EQUIPMENT[k]?.label||k)}">${esc(EQUIPMENT[k]?.mark||"•")}</span>`).join("");
-    btn.innerHTML = `
-      <span class="seat-model" aria-hidden="true">
-        <span class="desk-edge"></span>
-        <span class="desk-surface"><span class="desk-lamp"></span><span class="desk-gear">${icons}</span></span>
-        <span class="seat-chair"><span class="chair-back"></span><span class="chair-cushion"></span></span>
-        ${booked ? '<span class="desk-reader"><i class="person-head"></i><i class="person-body"></i></span>' : ""}
-      </span>
-      <span class="seat-label">${esc(cfg.code)}</span><span class="seat-point"></span>`;
-    btn.onclick = () => {
-      if (!seat) { notify("座位資料尚未建立。請管理者執行新增包廂SQL。"); return; }
-      const was = selectedSeat;
-      selectedSeat = seat.id;
-      if (was !== seat.id) $("issue-form").classList.add("hidden");
-      $("report-reveal").setAttribute("aria-expanded","false");
-      renderMap();
+  function createSeatButton(place, room) {
+    const cfg = getSeatConfig(room, place.no);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `seat-object seat-form-${place.shape} facing-${place.facing}`;
+    button.dataset.seatNo = String(place.no);
+    button.style.left = `${place.x}%`;
+    button.style.top = `${place.y}%`;
+    const icons = place.equipment.slice(0, 3).map(key =>
+      `<span class="desk-equipment" title="${esc(EQUIPMENT[key]?.label || key)}">${esc(EQUIPMENT[key]?.mark || "•")}</span>`).join("");
+
+    if (place.shape === "recliner") {
+      button.innerHTML = `
+        <span class="seat-model pod-model" aria-hidden="true">
+          <span class="pod-shell"><span class="pod-canopy"></span><span class="pod-headrest"></span><span class="pod-cushion"></span><span class="pod-footrest"></span></span>
+          <span class="pod-gear">${icons}</span>
+        </span><span class="seat-label">${esc(cfg.code)}</span><span class="seat-point"></span>`;
+    } else if (place.shape === "workbench") {
+      button.innerHTML = `
+        <span class="seat-model workbench-model" aria-hidden="true">
+          <span class="desk-edge"></span><span class="desk-surface"><span class="bench-divider"></span><span class="desk-gear">${icons}</span></span>
+          <span class="seat-chair"><span class="chair-back"></span><span class="chair-cushion"></span></span>
+        </span><span class="seat-label">${esc(cfg.code)}</span><span class="seat-point"></span>`;
+    } else {
+      button.innerHTML = `
+        <span class="seat-model lounge-model" aria-hidden="true">
+          <span class="desk-edge"></span><span class="desk-surface"><span class="desk-lamp"></span><span class="desk-gear">${icons}</span></span>
+          <span class="seat-chair"><span class="chair-back"></span><span class="chair-cushion"></span></span><span class="seat-ottoman"></span>
+        </span><span class="seat-label">${esc(cfg.code)}</span><span class="seat-point"></span>`;
+    }
+
+    button.onclick = () => {
+      if (seatView?.room !== room) return;
+      const actual = seatView.seats.find(item => item.seat_no === place.no);
+      if (selectedPreviewNo !== place.no) {
+        $("issue-form").classList.add("hidden");
+        $("report-reveal").setAttribute("aria-expanded", "false");
+      }
+      selectedPreviewNo = place.no;
+      selectedSeat = actual?.id || null;
+      updateSeatNodes();
       updateSummary();
       if (window.matchMedia("(max-width: 860px)").matches) {
-        $("summary").scrollIntoView({behavior:"smooth",block:"nearest"});
+        $("summary").scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
     };
-    return btn;
+    return button;
   }
+
+  function updateSeatNodes() {
+    if (!seatView) return;
+    const seatsByNo = new Map(seatView.seats.map(seat => [seat.seat_no, seat]));
+    const emphasize = $("bookable-only").checked;
+    for (const button of $("floorplan").querySelectorAll(".seat-object")) {
+      const no = Number(button.dataset.seatNo);
+      const actual = seatsByNo.get(no);
+      const booked = !!actual && seatView.bookedSet.has(actual.id);
+      const available = !!actual && isBookable(actual, seatView);
+      const selected = selectedPreviewNo === no;
+      const state = !actual ? "未建置" : !actual.is_active ? "停用" : seatView.isBlocked ? "封鎖" : booked ? "已登記" : "可登記";
+      button.classList.toggle("seat-missing", !actual);
+      button.classList.toggle("seat-offline", !!actual && (!actual.is_active || seatView.isBlocked));
+      button.classList.toggle("seat-occupied", booked);
+      button.classList.toggle("seat-open", available);
+      button.classList.toggle("is-selected", selected);
+      button.classList.toggle("is-dimmed", emphasize && !available);
+      button.setAttribute("aria-pressed", String(selected));
+      button.setAttribute("aria-label", `${DESIGNS[seatView.room].code}${String(no).padStart(2, "0")}，${state}，可點擊查看詳情`);
+      const model = button.querySelector(".seat-model");
+      const reader = model.querySelector(".desk-reader");
+      if (booked && !reader) {
+        const person = document.createElement("span");
+        person.className = "desk-reader";
+        person.innerHTML = '<i class="person-head"></i><i class="person-body"></i>';
+        model.appendChild(person);
+      } else if (!booked && reader) reader.remove();
+    }
+  }
+
 
   // --- 預約摘要面板更新 ---
   function updateSummary() {
