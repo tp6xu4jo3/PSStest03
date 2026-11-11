@@ -28,6 +28,19 @@
     return `${String(hour + 1).padStart(2, "0")}:00`;
   }
 
+  function reservationTimeState(date, startTime, now) {
+    const today = now.dateStr;
+    if (date < today) return "ended";
+    if (date > today) return "future";
+    const startHour = Number(String(startTime).slice(0, 2));
+    const startMinute = Number(String(startTime).slice(3, 5));
+    const nowMinute = now.hour * 60 + now.minute;
+    const start = startHour * 60 + startMinute;
+    if (nowMinute < start) return "future";
+    if (nowMinute >= start + 60) return "ended";
+    return "active";
+  }
+
   function reservationCsvRows(reservations, roomNames, statusNames) {
     return reservations.map(reservation => [
       roomNames[reservation.room_code] || "閱覽室",
@@ -39,5 +52,5 @@
     ]);
   }
 
-  return { csvCell, endTime, reservationCsvRows, toCsv };
+  return { csvCell, endTime, reservationCsvRows, reservationTimeState, toCsv };
 });
