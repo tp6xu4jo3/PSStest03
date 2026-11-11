@@ -1,75 +1,78 @@
-# B1包廂自習室｜互動式座位服務設計概念
+# 包廂自習室｜座位資訊與現場狀態核對原型
 
-> **非北科大圖書館官方服務。** 本專案的A／B／C是「額外新建的三間主題包廂自習室」設計情境。沒有實際建置或校方核准資料，平面圖、設備、座位登記、人物走動和回報紀錄都屬教學原型。人物動畫尤其**不能用來判斷現場是否真的有人**，已登記只代表原型資料庫的狀態。
+> 本專案是教學研究原型，未經館方核准，也未連接北科大圖書館正式系統。所有包廂、座位、物品及攝影機辨識結果均為假設和模擬資料，不能據此取得館內實際座位。
 
-## 三間房間
+## 初步問題定義
 
-- **A · Cozy Room：12席**。不對稱暖木閱讀角、圓桌、植栽與地毯，採柔和轉角的房間輪廓。
-- **B · Sleepy Room：16席**。16座類航廈休憩躺椅，含頭靠、腳托與半包覆遮蔽；房間有凹室、側窗與柱子。
-- **C · Discipline Room：20席**。四組共享長工作桌與桌面隔板，保留中央動線，採階梯形房間邊界與側窗。
+**座位登記資訊與現場實際占用可能不一致**：使用者在系統看到空位，到了現場卻發現物品占位，必須重新找位、重新登記，還可能不知道要向誰反映、反映後是否有人處理。
 
-總共48席，均為新建包廂的**概念配置**，不應與北科大現有自習室席數混為一談。
+### 解法與使用情境的區分
 
-### 使用流程
+- **使用情境（附加設定）：**假設圖書館額外新建三間主題包廂。Cozy Room有12席閱讀角、Sleepy Room有16席休憩躺椅、Discipline Room有20席共享長桌。主題、設備、座位配置及斜角立體模型，用來協助理解空間；**它們本身不是解決資訊落差的核心手段**。
+- **核心解法（本版模擬）：**假設每間包廂有攝影機。電腦收到物品辨識結果（包包或書籍），會和所選日期／時段的系統登記比對。如果顯示**未登記卻偵測到物品**，就建立異常通報，顯示在座位2.5D模型上，通知管理員並暫停該席的新登記。館員現場確認物品排除後，點選**確認排除・解除通報**，異常標記消失、座位恢復原狀。
+- **重要限制：**目前沒有真實攝影機、物件辨識模型或硬體串接；是由原型管理員按「模擬偵測並比對」，產生一筆*人工注入的辨識訊號*，後續比對與通報流程由Supabase資料庫執行。**沒有上傳、蒐集或儲存影像，也無法辨認物品所有者。**正式使用前必須驗證誤判率、館規、隱私及人員處理程序。
 
-選擇主題包廂 → 日期與時段 → 點選地圖中的桌椅 → 查看座號、設備與登記狀態 → 可登記時提交預約。已登記、停用的座位仍可查看與回報異常，**不會因為能點選而變得可預約**。座位異常回報只會在點選座位後出現。
+## 其他問題的處理盤點
 
-房間採輕量斜角視覺，不需Three.js或其他3D服務。已登記座位標成紅色並顯示人物，但**這只是原型預約狀態，不是實際現場有人**；走道人物按路徑移動。切換座位、日期或時段只更新座位狀態，不會重建房間與重播行走動畫。支援系統減少動態效果設定。
+| 原始使用問題 | 目前實作 | 解決程度 |
+|---|---|---|
+| 系統顯示空位，現場卻有物品 | 模擬物品偵測 → 與登記比對 → 地圖顯示物品／異常 → 通報管理員 | **概念流程已實作；實際辨識未驗證** |
+| 現場問題不知道如何回報／通報後沒結果 | 點座位後可手動回報；館員有待處理列表、結案按鈕；使用者可追蹤自己的回報狀態 | **原型流程已實作；非官方管道** |
+| 找位耗時、看不出座位設備 | 可查看分區、預約狀態、配備及3D座位位置；異常席暫停登記 | **改善資訊呈現；未經實地可用性驗證** |
+| 發現座位被占後必須重新排隊／回機台登記 | 網頁可直接選時段、選位與取消原型登記 | **僅在本原型可用，未串接校方機台或門禁** |
+| 暫離／返回與現場實際使用狀態不清 | 未提供報到、暫離、返回及判定超時的完整流程 | **尚未解決**；後續需向館方確認規則，設計報到／暫離／回座標記，再評估與攝影機結果的交叉檢核 |
 
-## 目錄
+本原型的攝影機異常判斷只會發出「需要人工核對」訊號，**不會自行認定使用者違規或自動搬走物品**。
+
+## 資料模型和安全
+
+- `room-data.js`：包廂的場景配置、家具及設備，不是館方真實場景。
+- `seats`、`reservations`：原型座位及登記資料。
+- `seat_reports`：學生手動通報，管理員可結案；學生只可讀取自己提交的報告。
+- `camera_alerts`：只存偵測**模擬事件的座位、物品類型、時間及狀態**，不存照片或影片。公開畫面只讀取未結案異常，管理端可讀取處理紀錄。
+- `simulate_camera_observation`與`resolve_camera_alert`：只有原型管理員可以呼叫的資料庫函式。
+- `book_seat`：在資料庫端拒絕對未排除異常的座位新增登記，避免只靠畫面禁用而失效。
+
+## Supabase手動操作
+
+**已有資料庫：先備份，不要重跑`supa/setup.sql`。**依序在Supabase → SQL Editor執行以下檔案；成功執行過的舊檔不必重複執行：
+
+1. [`supa/migrations/20261111_ntut_b1_demo.sql`](supa/migrations/20261111_ntut_b1_demo.sql)：建立三區基礎座位與手動回報。
+2. [`supa/migrations/20261111_private_rooms_expansion.sql`](supa/migrations/20261111_private_rooms_expansion.sql)：將座位補齊為A12、B16、C20席。
+3. **[ `supa/migrations/20261111_camera_alert_demo.sql` ](supa/migrations/20261111_camera_alert_demo.sql)：本次新增，建立影像異常模擬資料與權限，更新預約函式阻擋異常席。**
+
+如果前兩份已完成，**本次只要執行第三份SQL**。這次不需要變更`account/index.ts`，沒有新增第三方服務。
+
+操作測試：
+1. 用原型管理員帳號進入「管理測試」→「模擬攝影機物品偵測」。
+2. 選擇包廂、座位、日期、時段與「背包／書籍」，點「模擬偵測並比對」。
+3. 如果該時段已有確認登記，系統會拒絕產生「空位卻有物品」警報；如果未登記，管理員列表出現待處理事件，地圖顯示物品與異常狀態。
+4. 異常席暫停新登記。管理員確認物品已排除後按「確認排除・解除通報」，地圖會移除標記並恢復可登記狀態。
+5. 學生仍可透過座位詳情手動回報其他問題，並在「我的登記」查看處理狀態。
+
+管理員測試帳號需在Supabase的`profiles.role`中由可信管理者設為`librarian`。不可將Service Role Key放進前端。
+
+## 程式架構
 
 ```text
-/
-├─ index.html              網站畫面及互動面板
-├─ styles.css              2.5D場景與全站動畫設計
-├─ room-data.js            房間主題、座位座標、設備與人物路徑
-├─ app.js                  預約、回報、資料更新、管理員操作
-├─ app-utils.js            CSV安全處理與時間格式
-├─ config.js               Supabase公開URL及公開Publishable Key
-├─ README.md               唯一Markdown說明
-├─ supa/
-│  ├─ setup.sql            **只供新資料庫初始化**
-│  ├─ migrations/
-│  │  ├─ 20261111_ntut_b1_demo.sql            基礎A/B/C座位與回報
-│  │  └─ 20261111_private_rooms_expansion.sql 擴充B16、C20席
-│  └─ functions/account/index.ts              現有註冊Function
-└─ tests/
-   ├─ app-utils.test.js
-   ├─ room-data.test.js
-   └─ room-interactions.test.js
+index.html                  介面與各項操作入口
+styles.css                  立體包廂、物品異常標記、回報介面
+room-data.js                A/B/C房間配置與家具
+app.js                      登記、異常呈現、管理員流程
+app-utils.js                CSV與時間工具
+config.js                   Supabase公開連線參數
+README.md                   唯一使用說明
+supa/
+  setup.sql                 全新資料庫初始化用
+  migrations/
+    20261111_ntut_b1_demo.sql
+    20261111_private_rooms_expansion.sql
+    20261111_camera_alert_demo.sql
+  functions/account/index.ts
+tests/
+  app-utils.test.js
+  room-data.test.js
+  room-interactions.test.js
 ```
 
-## Supabase需要手動更新
-
-**先備份資料庫，現有專案不要重跑`supa/setup.sql`。**
-
-請在Supabase → SQL Editor依序執行以下SQL。已經成功執行過第一份就略過它：
-
-1. [`supa/migrations/20261111_ntut_b1_demo.sql`](supa/migrations/20261111_ntut_b1_demo.sql)：建立A／B／C示範區基礎座位及`seat_reports`。
-2. [`supa/migrations/20261111_private_rooms_expansion.sql`](supa/migrations/20261111_private_rooms_expansion.sql)：增量擴充座位上限並新增B13–B16、C13–C20。保留既有資料和預約。
-
-檢查結果：
-```sql
-select room_code,count(*) as seats
-from public.seats
-where room_code in ('b1a','b1b','b1c')
-group by room_code order by room_code;
--- 應得到 b1a=12、b1b=16、b1c=20
-```
-
-原有註冊功能名稱為Supabase Edge Functions → **account**，程式位置[`supa/functions/account/index.ts`](supa/functions/account/index.ts)。如果先前尚未將最新版部署至Supabase，請更新並重新部署。沒有Cloudflare Turnstile等額外服務設定。
-
-需要管理員時，先註冊測試帳號，再由Supabase SQL Editor調整其`profiles.role`為`librarian`。管理端現在以**「停用座位」和「啟用座位」兩個獨立按鈕**操作，並顯示目前狀態，不會用一個按鈕盲目切換。
-
-## 技術與測試
-
-- GitHub Pages靜態前端：原生HTML/CSS/JavaScript。
-- Supabase：Auth、Postgres、RLS、RPC、Edge Function。
-- `room-data.js`包含各室座位座標、不同家具、設備、外形、窗戶、裝飾與人物路線；資料庫`seats`存原型seat ID及啟用狀態，`reservations`記錄登記。無即時實體占用感測器。未建置座位可以查看概念配置，但不能登記或回報。
-- `app-utils.js`提供CSV處理、防試算表公式注入；保留`tests/app-utils.test.js`，並以`tests/room-data.test.js`、`tests/room-interactions.test.js`檢查配置、座位點擊與動畫不重播。可用Node.js執行`node --test tests/*.test.js`。
-- 不能把Supabase Service Role Key放進前端；`config.js`只能存公開連線資訊。
-- 靜態場景切換採CSS動畫；在`prefers-reduced-motion`條件下關閉動態。
-
-## 限制
-
-概念座位數、設備與空間配置尚未經校方或現場驗證；沒有官方SSO、門禁、實體占用狀態與校方通報串接，不能用來實際預約北科大座位。沒有實測前不可宣稱改善學習或使用效果。
+測試可使用Node.js執行`node --test tests/*.test.js`。程式碼已規劃原型權限與資料一致性檢查，但**實際Supabase資料庫升級、真實攝影機辨識、館員作業與使用者成效都尚未完成現場驗證**。
