@@ -596,7 +596,21 @@
       item.style.top = `${decor.y}%`;
       if (decor.type === "plant") item.innerHTML = '<i class="prop-leaf"></i><i class="prop-pot"></i>';
       else if (decor.type === "column") item.innerHTML = '<i class="prop-column"></i>';
-      else if (decor.type === "workbench") item.innerHTML = '<i class="prop-bench-top"></i><i class="prop-bench-support"></i>';
+      else if (decor.type === "workbench") {
+        item.dataset.benchId = decor.id;
+        item.style.width = `${decor.width}%`;
+        const places = design.seats.filter(seat => seat.benchId === decor.id);
+        item.innerHTML = `
+          <i class="prop-bench-top"></i>
+          <i class="prop-bench-support"></i>
+          <span class="bench-places">
+            ${places.map(seat => `
+              <span class="bench-place bench-${seat.side}" data-bench-seat="${seat.no}"
+                style="--station-slot:${seat.slot};--station-count:${seat.side === "north" ? 3 : 2}">
+              </span>
+            `).join("")}
+          </span>`;
+      }
       else item.innerHTML = '<i></i>';
       furniture.appendChild(item);
     }
@@ -639,8 +653,8 @@
     } else if (place.shape === "workbench") {
       button.innerHTML = `
         <span class="seat-model workbench-model" aria-hidden="true">
-          <span class="desk-edge"></span><span class="desk-surface"><span class="bench-divider"></span><span class="desk-gear">${icons}</span></span>
           <span class="seat-chair"><span class="chair-back"></span><span class="chair-cushion"></span></span>
+          <span class="bench-chair-gear">${icons}</span>
         </span><span class="seat-label">${esc(cfg.code)}</span><span class="seat-point"></span>`;
     } else {
       button.innerHTML = `
@@ -695,6 +709,14 @@
         person.innerHTML = '<i class="person-head"></i><i class="person-body"></i>';
         model.appendChild(person);
       } else if (!booked && reader) reader.remove();
+    }
+    for (const place of $("floorplan").querySelectorAll(".bench-place")) {
+      const no = Number(place.dataset.benchSeat);
+      const seat = seatsByNo.get(no);
+      const booked = !!seat && seatView.bookedSet.has(seat.id);
+      place.classList.toggle("is-booked", booked);
+      place.classList.toggle("is-selected", selectedPreviewNo === no);
+      place.classList.toggle("is-offline", !seat || !seat.is_active || seatView.isBlocked);
     }
   }
 
