@@ -35,7 +35,8 @@
 │  └─ functions/account/index.ts              現有註冊Function
 └─ tests/
    ├─ app-utils.test.js
-   └─ room-data.test.js
+   ├─ room-data.test.js
+   └─ room-interactions.test.js
 ```
 
 ## Supabase需要手動更新
@@ -65,7 +66,7 @@ group by room_code order by room_code;
 - GitHub Pages靜態前端：原生HTML/CSS/JavaScript。
 - Supabase：Auth、Postgres、RLS、RPC、Edge Function。
 - `room-data.js`包含各室座位座標、不同家具、設備、外形、窗戶、裝飾與人物路線；資料庫`seats`存原型seat ID及啟用狀態，`reservations`記錄登記。無即時實體占用感測器。未建置座位可以查看概念配置，但不能登記或回報。
-- `app-utils.js`提供CSV處理、防試算表公式注入；保留`tests/app-utils.test.js`，並新增`tests/room-data.test.js`驗證房間座位配置。可用Node.js執行`node --test tests/*.test.js`。
+- `app-utils.js`提供CSV處理、防試算表公式注入；保留`tests/app-utils.test.js`，並以`tests/room-data.test.js`、`tests/room-interactions.test.js`檢查配置、座位點擊與動畫不重播。可用Node.js執行`node --test tests/*.test.js`。
 - 不能把Supabase Service Role Key放進前端；`config.js`只能存公開連線資訊。
 - 靜態場景切換採CSS動畫；在`prefers-reduced-motion`條件下關閉動態。
 
