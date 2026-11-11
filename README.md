@@ -1,79 +1,72 @@
-# 北科大B1自習室｜座位服務設計原型
+# B1包廂自習室｜互動式座位服務設計概念
 
-> **教學研究原型，不是北科大圖書館的官方網站。** 不連接官方座位、門禁、校務登入或正式回報管道；畫面顯示的座號、空位、預約時間與回報紀錄都是本專案的**示範資料**，不可據此實際占位。
+> **非北科大圖書館官方服務。** 本專案的A／B／C是「額外新建的三間主題包廂自習室」設計情境。沒有實際建置或校方核准資料，平面圖、設備、座位登記、人物走動和回報紀錄都屬教學原型。人物動畫尤其**不能用來判斷現場是否真的有人**，已登記只代表原型資料庫的狀態。
 
-以北科大圖書館B1自習室A／B／C三區為設計情境，提供模擬選位、座位登記、個人紀錄、取消、占位異常回報及原型管理員管理功能。每區僅配置**12個虛構座位**（共36席），不是校方正式座位配置。
+## 三間房間
 
-## 檔案位置
+- **A · Cozy Room：12席**。暖木色、植栽、舒適閱讀感。以參考圖片的三排四席為起點。
+- **B · Sleepy Room：16席**。柔霧藍紫、沿牆座位與中央書桌，提供柔和安靜的氛圍。
+- **C · Discipline Room：20席**。整齊五列四排、明確動線，適合偏好規律配置的使用者。
+
+總共48席，均為新建包廂的**概念配置**，不應與北科大現有自習室席數混為一談。
+
+### 使用流程
+
+選擇主題包廂 → 日期與時段 → 點選地圖中的桌椅 → 查看座號、設備與登記狀態 → 可登記時提交預約。已登記、停用的座位仍可查看與回報異常，**不會因為能點選而變得可預約**。座位異常回報只會在點選座位後出現。
+
+房間採輕量2.5D斜角視覺，不需Three.js或其他3D服務。畫面小人僅用於表現場景氣氛；已預約顯示坐姿角色，走道角色按預定路線移動，並遵守使用者減少動態效果的系統設定。
+
+## 目錄
 
 ```text
 /
-├─ index.html                    網頁結構
-├─ styles.css                    介面樣式
-├─ app.js                        座位、登入、回報及管理流程
-├─ app-utils.js                  CSV安全逸出、匯出欄位與時間格式
-├─ config.js                     Supabase公開連線設定
-├─ README.md                     本說明（唯一Markdown檔）
-├─ .gitignore
+├─ index.html              網站畫面及互動面板
+├─ styles.css              2.5D場景與全站動畫設計
+├─ room-data.js            房間主題、座位座標、設備與人物路徑
+├─ app.js                  預約、回報、資料更新、管理員操作
+├─ app-utils.js            CSV安全處理與時間格式
+├─ config.js               Supabase公開URL及公開Publishable Key
+├─ README.md               唯一Markdown說明
 ├─ supa/
-│  ├─ setup.sql                  首次建立空白資料庫使用
+│  ├─ setup.sql            **只供新資料庫初始化**
 │  ├─ migrations/
-│  │  └─ 20261111_ntut_b1_demo.sql   **既有資料庫**升級用
-│  └─ functions/
-│     └─ account/
-│        └─ index.ts             註冊Edge Function
-└─ tests/
-   └─ app-utils.test.js          CSV與時間格式單元測試
+│  │  ├─ 20261111_ntut_b1_demo.sql            基礎A/B/C座位與回報
+│  │  └─ 20261111_private_rooms_expansion.sql 擴充B16、C20席
+│  └─ functions/account/index.ts              現有註冊Function
+└─ tests/app-utils.test.js
 ```
 
-## Supabase：需要手動修改的位置
+## Supabase需要手動更新
 
-**先備份資料庫。現有專案請勿重跑`supa/setup.sql`。**
+**先備份資料庫，現有專案不要重跑`supa/setup.sql`。**
 
-1. **現有資料庫：** Supabase → SQL Editor，執行 [`supa/migrations/20261111_ntut_b1_demo.sql`](supa/migrations/20261111_ntut_b1_demo.sql)。它擴充原有資料表並建立B1示範座位與`seat_reports`，不會刪除舊資料。
-2. **全新資料庫：**先執行 [`supa/setup.sql`](supa/setup.sql)，再執行前述增量SQL。舊版初始化內容保留作為新資料庫的結構前置。
-3. **註冊Function：**Supabase → Edge Functions → `account`，用 [`supa/functions/account/index.ts`](supa/functions/account/index.ts) 更新既有的 `account` Function。`account` 是部署名稱，檔案仍叫 `index.ts`。
-4. **無需其他第三方設定：**註冊只使用原有的Supabase Auth、Edge Function與Postgres限流函式`allow_registration_attempt`（位於`supa/setup.sql`）；新的Edge Function會對同一虛構測試編號每小時限制5次註冊嘗試，僅保存識別碼雜湊。更新Edge Function後即不需要額外驗證服務或其金鑰。
-5. **安全提醒：**不得把Supabase Service Role Key放進前端。此註冊方式沒有真人驗證，使用者可更換編號，限流不能完全阻止大量自動註冊；僅供教學原型，公開正式服務需另行評估安全性。原型帳號不能當作北科大校務登入。
+請在Supabase → SQL Editor依序執行以下SQL。已經成功執行過第一份就略過它：
 
-### 以Supabase CLI部署Function
+1. [`supa/migrations/20261111_ntut_b1_demo.sql`](supa/migrations/20261111_ntut_b1_demo.sql)：建立A／B／C示範區基礎座位及`seat_reports`。
+2. [`supa/migrations/20261111_private_rooms_expansion.sql`](supa/migrations/20261111_private_rooms_expansion.sql)：增量擴充座位上限並新增B13–B16、C13–C20。保留既有資料和預約。
 
-Supabase CLI預設讀取**`supabase/functions/`**，而本repo依需求將後台檔案集中於**`supa/`**。使用CLI時，需在本機建立臨時預設路徑，複製Function後部署（請勿把臨時`supabase/`資料夾提交到repo）：
-
-```bash
-mkdir -p supabase/functions
-cp -R supa/functions/account supabase/functions/
-supabase login
-supabase link --project-ref YOUR_PROJECT_REF
-supabase functions deploy account
-```
-
-可改用Supabase Dashboard的Edge Function編輯器手動更新程式，不必建立臨時目錄。必須確認執行環境可讀取`SUPABASE_URL`與`SUPABASE_SERVICE_ROLE_KEY`。
-
-### 執行後檢查
-
+檢查結果：
 ```sql
-select room_code, count(*) as demo_seats
+select room_code,count(*) as seats
 from public.seats
 where room_code in ('b1a','b1b','b1c')
 group by room_code order by room_code;
--- 預期：每區12個示範席位
+-- 應得到 b1a=12、b1b=16、b1c=20
 ```
 
-如需原型管理員，先用測試帳號註冊，再於Supabase SQL Editor將該帳號`profiles.role`設為`librarian`；不要授予不可信使用者。原型資料不是校方正式座位資訊。
+原有註冊功能名稱為Supabase Edge Functions → **account**，程式位置[`supa/functions/account/index.ts`](supa/functions/account/index.ts)。如果先前尚未將最新版部署至Supabase，請更新並重新部署。沒有Cloudflare Turnstile等額外服務設定。
 
-## 檢查與測試
+需要管理員時，先註冊測試帳號，再由Supabase SQL Editor調整其`profiles.role`為`librarian`。管理端現在以**「停用座位」和「啟用座位」兩個獨立按鈕**操作，並顯示目前狀態，不會用一個按鈕盲目切換。
 
-- 先完成SQL與Edge Function部署，才能正常使用新分區、註冊與回報功能；不需要其他第三方設定。
-- 同座位同時段避免重複登記，操作後可取消。
-- 一般使用者可回報座位遭占用、設備異常等狀況；僅原型管理員可檢視全部並結案。
-- `tests/app-utils.test.js`用來驗證CSV特殊字元、公式注入防護、時間格式與匯出欄位不含學號等識別資料。若已安裝Node.js，可執行`node --test tests/app-utils.test.js`。
-- `app-utils.js`被`app.js`實際引用，故保留；如果刪除，CSV匯出與部分時間顯示會失效。
+## 技術與測試
 
-## 參考資料與限制
+- GitHub Pages靜態前端：原生HTML/CSS/JavaScript。
+- Supabase：Auth、Postgres、RLS、RPC、Edge Function。
+- `room-data.js`純前端座位與設備配置；資料庫`seats`持有真正供原型使用的seat ID、啟用狀態，`reservations`記錄登記。無即時實體占用感測器。
+- `app-utils.js`提供CSV處理、防試算表公式注入；保留`tests/app-utils.test.js`。可用Node.js執行`node --test tests/*.test.js`。
+- 不能把Supabase Service Role Key放進前端；`config.js`只能存公開連線資訊。
+- 靜態場景切換採CSS動畫；在`prefers-reduced-motion`條件下關閉動態。
 
-- [北科大校方空間資料](https://irsdc.ntut.edu.tw/p/426-1145-10.php?Lang=zh-tw)：B1自習室有A／B／C三區，合計275席（不代表本原型的36個模擬座位）。
-- [北科大圖書館使用及借閱規則](https://library.ntut.edu.tw/p/412-1024-2675.php)：發布的規則版本可能不是現行細則，正式系統需再由館方確認。
-- 2023年北科大Dcard使用經驗談及其他學校座位管理流程僅作設計研究參考，個別貼文不能代表問題發生率。
+## 限制
 
-尚未完成官方SSO、真實座位配置與座號、正式登記／報到／暫離規則、官方系統API串接、實地使用測試；因此不得宣稱改善成效已獲驗證。
+概念座位數、設備與空間配置尚未經校方或現場驗證；沒有官方SSO、門禁、實體占用狀態與校方通報串接，不能用來實際預約北科大座位。沒有實測前不可宣稱改善學習或使用效果。
