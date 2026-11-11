@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#081522">
-  <title>北科大 B1 自習室｜座位服務設計原型</title>
-  <meta name="description" content="北科大 B1 自習室座位服務教學原型，展示分區選位、模擬登記與占位異常回報；未串接校方系統。">
-  <meta property="og:title" content="北科大 B1 自習室｜座位服務設計原型">
-  <meta property="og:description" content="北科大 B1 自習室教學原型；座位數及使用狀態均為模擬，非官方預約系統。">
+  <title>包廂自習室｜座位異常偵測與管理原型</title>
+  <meta name="description" content="以假設的新建主題包廂為情境，模擬比對座位登記與攝影機物品偵測結果，向管理員通報異常並處理。未串接真實攝影機。>
+  <meta property="og:title" content="包廂自習室｜座位異常偵測與管理原型">
+  <meta property="og:description" content="假設新建的包廂自習室，使用模擬影像觀測資訊比對原型登記狀態，呈現異常與管理員處理流程。">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -59,6 +59,7 @@
           <div class="legend">
             <span><i class="key available"></i>可登記</span>
             <span><i class="key booked"></i>已登記</span>
+            <span><i class="key anomaly"></i>物品異常</span>
             <span><i class="key disabled"></i>停用</span>
             <span><i class="key selected"></i>已選取</span>
           </div>
@@ -78,6 +79,7 @@
           <dl><div><dt>包廂</dt><dd id="sum-room">A · Cozy Room</dd></div><div><dt>特色配置</dt><dd id="sum-zone">—</dd></div><div><dt>日期</dt><dd id="sum-date">—</dd></div><div><dt>時段</dt><dd id="sum-slot">—</dd></div></dl>
           <div id="seat-inspector" class="seat-inspector hidden" aria-live="polite">
             <div class="inspector-status-row"><span id="inspection-status" class="seat-state-pill">—</span><span id="inspection-code" class="seat-code-text">—</span></div>
+            <div id="vision-seat-status" class="vision-seat-status hidden" role="status"></div>
             <button id="report-reveal" type="button" class="report-reveal">回報此座位問題 <span aria-hidden="true">↗</span></button>
             <form id="issue-form" class="issue-form hidden">
               <input id="issue-seat" type="hidden">
@@ -100,6 +102,16 @@
     <section id="admin-view" class="view hidden">
       <div class="page-heading"><span class="eyebrow">LIBRARIAN / 03</span><h2>原型管理</h2><p>管理示範座位、模擬登記與使用者回報；不連接校方後台。</p></div>
       <div class="admin-grid">
+        <section class="panel admin-card vision-simulator">
+          <h3>模擬攝影機物品偵測</h3>
+          <p class="fineprint">以人工輸入的「偵測到物品」訊號，模擬電腦比對該時段的座位登記。沒有連接攝影機，也沒有儲存影像。</p>
+          <label>包廂<select id="vision-room"><option value="b1a">A · Cozy Room</option><option value="b1b">B · Sleepy Room</option><option value="b1c">C · Discipline Room</option></select></label>
+          <label>座位<select id="vision-seat"></select></label>
+          <label>觀察日期<input type="date" id="vision-date"></label>
+          <label>觀察時段<select id="vision-slot"></select></label>
+          <label>辨識物品<select id="vision-object"><option value="bag">背包</option><option value="books">書籍</option></select></label>
+          <button id="vision-simulate" class="secondary-button" type="button">模擬偵測並比對</button>
+        </section>
         <section class="panel admin-card"><h3>停用 / 啟用座位</h3><label>閱覽室<select id="admin-room"><option value="b1a">A · Cozy Room</option><option value="b1b">B · Sleepy Room</option><option value="b1c">C · Discipline Room</option></select></label><label>座位<select id="admin-seat"></select></label><p id="admin-seat-status" class="admin-seat-status" role="status">讀取座位狀態中…</p><div class="admin-seat-actions"><button id="disable-seat" class="secondary-button" type="button">停用座位</button><button id="enable-seat" class="secondary-button" type="button">啟用座位</button></div></section>
         <section class="panel admin-card"><h3>封鎖時段</h3><label>閱覽室<select id="block-room"><option value="b1a">A · Cozy Room</option><option value="b1b">B · Sleepy Room</option><option value="b1c">C · Discipline Room</option></select></label><label>日期<input id="block-date" type="date"></label><label>時段<select id="block-slot"></select></label><label>原因<input id="block-reason" maxlength="120" placeholder="例：設備維護"></label><button id="block-submit" class="secondary-button">封鎖此時段</button></section>
       </div>
@@ -119,7 +131,12 @@
         <div id="blocked-slots" class="table-wrap">載入中…</div>
       </section>
       <section class="panel admin-table">
-        <div class="section-heading"><h3>座位異常回報（原型）</h3><button id="reports-refresh" class="text-button" type="button">重新整理</button></div>
+        <div class="section-heading"><h3>攝影機物品異常｜待館員處理</h3><button id="camera-refresh" class="text-button" type="button">重新整理</button></div>
+        <p class="fineprint">僅顯示模擬偵測資料。館員確認現場已清除物品後，可點選「確認排除・解除通報」。</p>
+        <div id="camera-alerts" class="table-wrap" aria-live="polite">登入管理員後查看。</div>
+      </section>
+      <section class="panel admin-table">
+        <div class="section-heading"><h3>學生手動回報</h3><button id="reports-refresh" class="text-button" type="button">重新整理</button></div>
         <div id="seat-issue-reports" class="table-wrap">登入管理測試帳號後查看。</div>
       </section>
     </section>
