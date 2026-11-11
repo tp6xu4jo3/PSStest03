@@ -606,7 +606,7 @@
           <span class="bench-places">
             ${places.map(seat => `
               <span class="bench-place bench-${seat.side}" data-bench-seat="${seat.no}"
-                style="--station-slot:${seat.slot};--station-count:${seat.side === "north" ? 3 : 2}">
+                style="left:${seat.slot * 100 / (seat.side === "north" ? 3 : 2)}%;width:${100 / (seat.side === "north" ? 3 : 2)}%">
               </span>
             `).join("")}
           </span>`;
