@@ -946,17 +946,21 @@
       return;
     }
     $("my-reservations").innerHTML = '<div class="loading">正在讀取預約…</div>';
-    const { data, error } = await sb.from("reservations")
-      .select("id,room_code,seat_id,reservation_date,start_time,status,seats(seat_no)")
-      .order("reservation_date", { ascending: true })
-      .order("start_time", { ascending: true });
+    const [{data,error},{data:presenceRows,error:presenceErr}] = await Promise.all([
+      sb.from("reservations")
+        .select("id,room_code,seat_id,reservation_date,start_time,status,seats(seat_no)")
+        .order("reservation_date", { ascending: true })
+        .order("start_time", { ascending: true }),
+      sb.rpc("get_my_reservation_presence")
+    ]);
 
-    if (error) {
-      $("my-reservations").textContent = "載入失敗，請稍後重試。";
+    if (error || presenceErr) {
+      $("my-reservations").textContent = "載入失敗，請先執行到席狀態SQL。";
       return;
     }
 
     cachedReservations = data || [];
+    const myPresence = new Map((presenceRows || []).map(row=>[row.reservation_id,row.presence_state]));
     // 依規定：有效預約顯示「加入行事曆」按鈕；已取消的預約不顯示
     const rows = cachedReservations.filter(r => r.status === "confirmed");
 
@@ -984,7 +988,7 @@
           </div>
           <div>
             ${startTimeFormatted}–${endHourFormatted} · 座位 ${seatNo}
-            <small>一小時</small>
+            <small class="my-presence" data-presence="${esc(myPresence.get(r.id) || "pending")}">模擬狀態：${esc(presenceNames[myPresence.get(r.id) || "pending"])}</small>
           </div>
           <div class="reservation-actions">
             <button class="calendar-button" data-ics="${r.id}" title="下載行事曆 .ics 檔案">加入行事曆 📅</button>
@@ -1314,18 +1318,37 @@
       const { data: seat, error: seatError } = await sb.from("seats").select("id")
         .eq("room_code",room).eq("seat_no",number).maybeSingle();
       if (seatError || !seat) throw new Error("SEAT_NOT_FOUND");
-      const { error } = await sb.rpc("simulate_camera_observation", {
-        p_seat_id: seat.id,
-        p_date: date,
-        p_start_time: slot + ":00",
-        p_object_type: $("vision-object").value
-      });
-      if (error) throw error;
-      notify("模擬偵測成立：系統顯示空位，但座位上有物品，已向管理員通報。");
+      const detected = $("vision-object").value;
+      let feedback;
+      if (detected === "person_present" || detected === "person_absent") {
+        const {data, error} = await sb.rpc("simulate_camera_presence", {
+          p_seat_id:seat.id, p_date:date, p_start_time:slot+":00",
+          p_person_detected:detected === "person_present"
+        });
+        if (error) throw error;
+        feedback = {
+          present:"模擬報到：預約座位偵測到人，已顯示到席人物。",
+          away:"模擬暫離：原本已報到，現在偵測不到人，座位保留。",
+          returned:"模擬回座：再次偵測到人，已恢復到席人物。",
+          pending:"目前尚未報到，無人訊號不會誤判為暫離。",
+          empty:"此時段沒有預約且未偵測到人，不需更新。",
+          anomaly:"此時段未登記卻偵測到人，已建立待排除通報。"
+        }[data] || "已更新模擬到席狀態。";
+      } else {
+        const {error} = await sb.rpc("simulate_camera_observation", {
+          p_seat_id:seat.id,p_date:date,p_start_time:slot+":00",
+          p_object_type:detected
+        });
+        if(error) throw error;
+        feedback = "模擬偵測到物品，而該時段沒有預約，已通報管理員。";
+      }
+      $("vision-feedback").textContent = feedback;
+      notify(feedback);
       await Promise.all([loadCameraAlerts(), refreshSeats({isBackground:true})]);
     } catch (e) {
       console.error(e);
       const message = e.message || "";
+      $("vision-feedback").textContent = "無法更新模擬狀態，請檢查下方提示及Supabase設定。";
       notify(message.includes("SEAT_ALREADY_REGISTERED")
         ? "該時段已有人登記，不符合「空位卻有物品」的異常條件。"
         : message.includes("SEAT_NOT_FOUND")
@@ -1334,8 +1357,8 @@
         ? "這個座位已停用，無法產生模擬偵測。"
         : message.includes("DATE_RANGE") || message.includes("TIME_RANGE")
         ? "模擬日期需在7天內，時段需為09:00–21:00的整點。"
-        : "模擬偵測無法完成，請先在Supabase執行攝影機異常SQL。");
-    } finally { setBusy(button, false, "模擬偵測並比對"); }
+        : "模擬偵測無法完成，請確認已在Supabase執行到席狀態SQL。");
+    } finally { setBusy(button, false, "套用模擬偵測"); }
   }
 
   async function updateCameraBadge() {
@@ -1351,7 +1374,7 @@
     const badge = $("camera-alert-badge");
     badge.textContent = String(current.size);
     badge.classList.toggle("hidden", current.size === 0);
-    if (newCount > 0) notify(`有${newCount}筆新的座位物品異常，請至管理頁處理。`);
+    if (newCount > 0) notify(`有${newCount}筆新的座位占用異常，請至管理頁處理。`);
   }
 
   async function loadCameraAlerts() {
@@ -1372,12 +1395,12 @@
     }
     const sorted = [...data].sort((a,b) => Number(b.status === "open") - Number(a.status === "open"));
     target.innerHTML = `<table>
-      <thead><tr><th>通報時間</th><th>包廂</th><th>座位</th><th>物品</th><th>比對時段</th><th>狀態</th><th>處理</th></tr></thead>
+      <thead><tr><th>通報時間</th><th>包廂</th><th>座位</th><th>偵測結果</th><th>比對時段</th><th>狀態</th><th>處理</th></tr></thead>
       <tbody>${sorted.map(a => `<tr>
         <td>${esc(new Date(a.detected_at).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}))}</td>
         <td>${esc(rooms[a.room_code] || a.room_code)}</td>
         <td>${esc(DESIGNS[a.room_code]?.code || "")}${String(a.seats?.seat_no || "").padStart(2,"0")}</td>
-        <td>${a.object_type === "books" ? "書籍" : "背包"}</td>
+        <td>${a.object_type === "books" ? "書籍" : a.object_type === "person" ? "人員" : "背包"}</td>
         <td>${esc(a.observed_date)} ${esc(String(a.observed_slot).slice(0,5))}</td>
         <td>${a.status === "open" ? '<span class="camera-alert-open">待排除</span>' : "已解除"}</td>
         <td>${a.status === "open"
