@@ -254,6 +254,7 @@
         .on("postgres_changes", { event: "*", schema: "public", table: "blocked_slots" }, () => onRemoteChange())
         .on("postgres_changes", { event: "*", schema: "public", table: "seats" }, () => onRemoteChange())
         .on("postgres_changes", { event: "*", schema: "public", table: "camera_alerts" }, () => onRemoteChange())
+        .on("postgres_changes", { event: "*", schema: "public", table: "reservation_presence" }, () => onRemoteChange())
         .subscribe((status) => {
           console.log("[Supabase Realtime] 連線狀態:", status);
         });
@@ -515,11 +516,13 @@
 
     try {
       const [{ data: seats, error: sErr }, { data: booked, error: bErr },
-        { data: blocked, error: kErr }, {data: cameraAlerts, error: aErr}] = await Promise.all([
+        { data: blocked, error: kErr }, {data: cameraAlerts, error: aErr},
+        {data: presenceRows, error: pErr}] = await Promise.all([
         sb.from("seats").select("id,seat_no,is_active").eq("room_code", room).order("seat_no"),
         sb.rpc("get_booked_seat_ids", { p_room_code: room, p_date: date, p_start_time: time + ":00" }),
         sb.from("blocked_slots").select("id").eq("room_code", room).eq("reservation_date", date).eq("start_time", time + ":00"),
-        sb.from("camera_alerts").select("id,seat_id,object_type").eq("room_code", room).eq("status", "open")
+        sb.from("camera_alerts").select("id,seat_id,object_type").eq("room_code", room).eq("status", "open"),
+        sb.rpc("get_seat_presence", {p_room_code:room,p_date:date,p_start_time:time+":00"})
       ]);
 
       // 若在此期間有更新的查詢發起，立即丟棄此過期回應，確保只顯示最新條件
@@ -528,13 +531,14 @@
         return;
       }
 
-      if (sErr || bErr || kErr || aErr) throw sErr || bErr || kErr || aErr;
+      if (sErr || bErr || kErr || aErr || pErr) throw sErr || bErr || kErr || aErr || pErr;
 
       const newSeatView = {
         room,
         seats: seats || [],
         bookedSet: new Set((booked || []).map(x => x.seat_id)),
         alertMap: new Map((cameraAlerts || []).map(a => [a.seat_id, a])),
+        presenceMap: new Map((presenceRows || []).map(item => [item.seat_id, item.presence_state])),
         isBlocked: (blocked || []).length > 0
       };
 
@@ -709,6 +713,13 @@
     return button;
   }
 
+  const presenceNames = {
+    pending: "已登記・待報到",
+    present: "已報到",
+    away: "暫離中",
+    returned: "已回座"
+  };
+
   function updateSeatNodes() {
     if (!seatView) return;
     const seatsByNo = new Map(seatView.seats.map(seat => [seat.seat_no, seat]));
@@ -718,13 +729,19 @@
       const actual = seatsByNo.get(no);
       const booked = !!actual && seatView.bookedSet.has(actual.id);
       const cameraAlert = actual ? seatView.alertMap?.get(actual.id) : null;
+      const presence = booked ? seatView.presenceMap?.get(actual.id) || "pending" : null;
+      const hasPerson = booked && (presence === "present" || presence === "returned");
       const available = !!actual && isBookable(actual, seatView);
       const selected = selectedPreviewNo === no;
       const state = !actual ? "未建置" : !actual.is_active ? "停用" : seatView.isBlocked ? "封鎖"
-        : cameraAlert ? "偵測到物品異常，已通報館員" : booked ? "已登記" : "可登記";
+        : cameraAlert ? "模擬偵測異常・已通報管理員" : booked ? presenceNames[presence] : "可登記";
       button.classList.toggle("seat-missing", !actual);
       button.classList.toggle("seat-offline", !!actual && (!actual.is_active || seatView.isBlocked));
       button.classList.toggle("seat-occupied", booked);
+      button.classList.toggle("seat-pending", booked && presence === "pending");
+      button.classList.toggle("seat-present", booked && presence === "present");
+      button.classList.toggle("seat-away", booked && presence === "away");
+      button.classList.toggle("seat-returned", booked && presence === "returned");
       button.classList.toggle("seat-anomaly", !!cameraAlert);
       button.classList.toggle("seat-open", available);
       button.classList.toggle("is-selected", selected);
@@ -733,12 +750,20 @@
       button.setAttribute("aria-label", `${DESIGNS[seatView.room].code}${String(no).padStart(2, "0")}，${state}，可點擊查看詳情`);
       const model = button.querySelector(".seat-model");
       const reader = model.querySelector(".desk-reader");
-      if (booked && !reader) {
+      if (hasPerson && !reader) {
         const person = document.createElement("span");
         person.className = "desk-reader";
         person.innerHTML = '<i class="person-head"></i><i class="person-body"></i>';
         model.appendChild(person);
-      } else if (!booked && reader) reader.remove();
+      } else if (!hasPerson && reader) reader.remove();
+      const awayMarker = model.querySelector(".away-indicator");
+      if (booked && presence === "away" && !awayMarker) {
+        const indicator = document.createElement("span");
+        indicator.className = "away-indicator";
+        indicator.textContent = "暫";
+        indicator.setAttribute("aria-hidden","true");
+        model.appendChild(indicator);
+      } else if (presence !== "away" && awayMarker) awayMarker.remove();
       const modelObject = model.querySelector(".detected-object");
       if (cameraAlert && !button.classList.contains("seat-form-workbench")) {
         if (!modelObject || !modelObject.classList.contains(`object-${cameraAlert.object_type}`)) {
@@ -752,7 +777,10 @@
       const seat = seatsByNo.get(no);
       const booked = !!seat && seatView.bookedSet.has(seat.id);
       const cameraAlert = seat ? seatView.alertMap?.get(seat.id) : null;
+      const presence = booked ? seatView.presenceMap?.get(seat.id) || "pending" : null;
       place.classList.toggle("is-booked", booked);
+      place.classList.toggle("is-away", booked && presence === "away");
+      place.classList.toggle("is-present", booked && (presence === "present" || presence === "returned"));
       place.classList.toggle("is-anomaly", !!cameraAlert);
       const existingObject = place.querySelector(".detected-object");
       if (cameraAlert) {
@@ -769,10 +797,12 @@
 
   function createDetectedObject(kind) {
     const item = document.createElement("span");
-    item.className = `detected-object object-${kind === "books" ? "books" : "bag"}`;
+    item.className = `detected-object object-${["books","person"].includes(kind) ? kind : "bag"}`;
     item.setAttribute("aria-hidden", "true");
     item.innerHTML = kind === "books"
       ? '<i class="book-bottom"></i><i class="book-top"></i>'
+      : kind === "person"
+      ? '<i class="person-head"></i><i class="person-body"></i>'
       : '<i class="bag-handle"></i><i class="bag-body"></i><i class="bag-pocket"></i>';
     return item;
   }
@@ -801,12 +831,17 @@
     if (config) {
       const booked = !!seat && seatView.bookedSet.has(seat.id);
       const alert = seat ? seatView.alertMap?.get(seat.id) : null;
+      const presence = booked ? seatView.presenceMap?.get(seat.id) || "pending" : null;
       const status = !seat ? "未建置" : !seat.is_active ? "停用"
-        : seatView.isBlocked ? "時段封鎖" : alert ? "物品異常・已通報館員"
-        : booked ? "已登記" : "可登記";
+        : seatView.isBlocked ? "時段封鎖" : alert ? "模擬占位異常・已通報"
+        : booked ? presenceNames[presence] : "可登記";
       $("vision-seat-status").classList.toggle("hidden", !alert);
       $("vision-seat-status").textContent = alert
-        ? `模擬偵測到${alert.object_type === "books" ? "書籍" : "背包"}，但系統顯示空位；已向管理員發出異常通報。排除前暫停登記。`
+        ? `模擬偵測到${alert.object_type === "books" ? "書籍" : alert.object_type === "person" ? "人員" : "背包"}，但系統顯示空位；已向管理員發出異常通報。排除前暫停登記。`
+        : "";
+      $("presence-seat-status").classList.toggle("hidden", !booked || !!alert);
+      $("presence-seat-status").textContent = booked && !alert
+        ? `${presenceNames[presence]}｜依模擬攝影機訊號推估，不能用於確認預約者身分。`
         : "";
       $("inspection-status").textContent = status;
       $("inspection-status").dataset.status = !seat || !seat.is_active || seatView.isBlocked
@@ -820,6 +855,8 @@
       $("issue-form").classList.add("hidden");
       $("vision-seat-status").classList.add("hidden");
       $("vision-seat-status").textContent = "";
+      $("presence-seat-status").classList.add("hidden");
+      $("presence-seat-status").textContent = "";
     }
     $("confirm-booking").disabled = !canBook;
     $("summary-hint").textContent = !config ? "點選座位查看資訊。"
