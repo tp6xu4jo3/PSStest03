@@ -1216,6 +1216,95 @@
     loadAdmin();
   }
 
+
+  function updateVisionSeatOptions() {
+    const room = $("vision-room").value;
+    const positions = DESIGNS[room]?.seats || [];
+    $("vision-seat").innerHTML = positions.map(pos =>
+      `<option value="${pos.no}">${esc(pos.code)}</option>`).join("");
+  }
+
+  async function simulateCameraObservation() {
+    if (profile?.role !== "librarian") return;
+    const room = $("vision-room").value;
+    const number = Number($("vision-seat").value);
+    const date = $("vision-date").value;
+    const slot = $("vision-slot").value;
+    if (!date || !slot || !number) { notify("請選擇觀察時段及座位。"); return; }
+    const button = $("vision-simulate");
+    setBusy(button, true);
+    try {
+      const { data: seat, error: seatError } = await sb.from("seats").select("id")
+        .eq("room_code",room).eq("seat_no",number).maybeSingle();
+      if (seatError || !seat) throw new Error("SEAT_NOT_FOUND");
+      const { error } = await sb.rpc("simulate_camera_observation", {
+        p_seat_id: seat.id,
+        p_date: date,
+        p_start_time: slot + ":00",
+        p_object_type: $("vision-object").value
+      });
+      if (error) throw error;
+      notify("模擬偵測成立：系統顯示空位，但座位上有物品，已向管理員通報。");
+      await Promise.all([loadCameraAlerts(), refreshSeats({isBackground:true})]);
+    } catch (e) {
+      console.error(e);
+      const message = e.message || "";
+      notify(message.includes("SEAT_ALREADY_REGISTERED")
+        ? "該時段已有人登記，不符合「空位卻有物品」的異常條件。"
+        : message.includes("SEAT_NOT_FOUND")
+        ? "座位資料尚未建立，請先執行座位SQL。"
+        : "模擬偵測無法完成，請先在Supabase執行攝影機異常SQL。");
+    } finally { setBusy(button, false, "模擬偵測並比對"); }
+  }
+
+  async function loadCameraAlerts() {
+    if (profile?.role !== "librarian") return;
+    const target = $("camera-alerts");
+    target.textContent = "載入中…";
+    const {data, error} = await sb.from("camera_alerts")
+      .select("id,room_code,seat_id,object_type,status,observed_date,observed_slot,detected_at,seats(seat_no)")
+      .order("detected_at",{ascending:false}).limit(100);
+    if (error) {
+      console.error(error);
+      target.textContent = "讀取失敗，請確認已執行攝影機異常SQL。";
+      return;
+    }
+    if (!data?.length) {
+      target.innerHTML = '<div class="empty">目前沒有模擬異常通報。</div>';
+      return;
+    }
+    const sorted = [...data].sort((a,b) => Number(b.status === "open") - Number(a.status === "open"));
+    target.innerHTML = `<table>
+      <thead><tr><th>通報時間</th><th>包廂</th><th>座位</th><th>物品</th><th>比對時段</th><th>狀態</th><th>處理</th></tr></thead>
+      <tbody>${sorted.map(a => `<tr>
+        <td>${esc(new Date(a.detected_at).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}))}</td>
+        <td>${esc(rooms[a.room_code] || a.room_code)}</td>
+        <td>${esc(DESIGNS[a.room_code]?.code || "")}${String(a.seats?.seat_no || "").padStart(2,"0")}</td>
+        <td>${a.object_type === "books" ? "書籍" : "背包"}</td>
+        <td>${esc(a.observed_date)} ${esc(String(a.observed_slot).slice(0,5))}</td>
+        <td>${a.status === "open" ? '<span class="camera-alert-open">待排除</span>' : "已解除"}</td>
+        <td>${a.status === "open"
+          ? `<button type="button" class="unblock-button" data-resolve-camera="${esc(a.id)}">確認排除・解除通報</button>`
+          : "—"}</td>
+      </tr>`).join("")}</tbody></table>`;
+    target.querySelectorAll("[data-resolve-camera]").forEach(button => {
+      button.onclick = () => resolveCameraAlert(button.dataset.resolveCamera);
+    });
+  }
+
+  async function resolveCameraAlert(id) {
+    if (profile?.role !== "librarian") return;
+    if (!confirm("請先確認現場物品已清除。確定解除這筆模擬攝影機警報嗎？")) return;
+    const {error} = await sb.rpc("resolve_camera_alert", {p_alert_id:id});
+    if (error) {
+      console.error(error);
+      notify("解除通報失敗，請確認管理員權限。");
+      return;
+    }
+    notify("已解除通報，座位恢復依登記狀態顯示。");
+    await Promise.all([loadCameraAlerts(), refreshSeats({isBackground:true})]);
+  }
+
   // --- 模擬座位異常回報：RLS 將權限限制為提交者與原型管理員 ---
   async function submitIssueReport(event) {
     event.preventDefault();
