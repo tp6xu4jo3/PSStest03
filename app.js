@@ -91,10 +91,20 @@
     $("block-date").max = shiftDate(7);
     $("block-date").value = shiftDate(0);
     $("block-slot").innerHTML = ALL_SLOTS.map(s => `<option value="${s}">${s}–${String(Number(s.slice(0, 2)) + 1).padStart(2, "0")}:00</option>`).join("");
+    $("vision-date").min = shiftDate(0);
+    $("vision-date").max = shiftDate(7);
+    $("vision-date").value = shiftDate(0);
+    $("vision-slot").innerHTML = $("block-slot").innerHTML;
+    $("vision-slot").value = ALL_SLOTS.includes(`${String(Math.min(20, Math.max(9, getTaipeiDateTime().hour))).padStart(2,"0")}:00`)
+      ? `${String(Math.min(20, Math.max(9, getTaipeiDateTime().hour))).padStart(2,"0")}:00` : "09:00";
 
     updateAdminSeatOptions();
     $("admin-room").addEventListener("change", updateAdminSeatOptions);
     $("admin-seat").addEventListener("change", updateAdminSeatState);
+    updateVisionSeatOptions();
+    $("vision-room").addEventListener("change", updateVisionSeatOptions);
+    $("vision-simulate").addEventListener("click", simulateCameraObservation);
+    $("camera-refresh").addEventListener("click", loadCameraAlerts);
     ["admin-filter-room", "admin-filter-date-from", "admin-filter-date-to", "admin-filter-status"]
       .forEach(id => $(id).addEventListener("change", loadAdminReservations));
 
@@ -242,6 +252,7 @@
         .on("postgres_changes", { event: "*", schema: "public", table: "reservations" }, () => onRemoteChange())
         .on("postgres_changes", { event: "*", schema: "public", table: "blocked_slots" }, () => onRemoteChange())
         .on("postgres_changes", { event: "*", schema: "public", table: "seats" }, () => onRemoteChange())
+        .on("postgres_changes", { event: "*", schema: "public", table: "camera_alerts" }, () => onRemoteChange())
         .subscribe((status) => {
           console.log("[Supabase Realtime] 連線狀態:", status);
         });
@@ -340,11 +351,16 @@
     if (!candidateSlots.length) return null;
 
     // 取得該室總啟用席數
-    const { data: activeSeats, error: seatError } = await sb.from("seats").select("id").eq("room_code", room).eq("is_active", true);
+    const [{ data: activeSeats, error: seatError }, {data: alerts, error: alertError}] = await Promise.all([
+      sb.from("seats").select("id").eq("room_code", room).eq("is_active", true),
+      sb.from("camera_alerts").select("seat_id").eq("room_code", room).eq("status", "open")
+    ]);
     if (queryId !== currentQueryId) return null;
-    if (seatError) throw seatError;
+    if (seatError || alertError) throw seatError || alertError;
     const totalActive = (activeSeats || []).length;
     if (!totalActive) throw new Error("B1_DEMO_SQL_MISSING");
+    const anomalousSeats = new Set((alerts || []).map(item => item.seat_id));
+    const usableSeats = (activeSeats || []).filter(seat => !anomalousSeats.has(seat.id));
 
     // 依序檢查最早有空位的時段
     for (const slot of candidateSlots) {
@@ -355,8 +371,8 @@
         p_start_time: slot + ":00"
       });
       if (queryId !== currentQueryId) return null;
-      const bookedCount = (booked || []).length;
-      if (bookedCount < totalActive) {
+      const bookedIds = new Set((booked || []).map(item => item.seat_id));
+      if (usableSeats.some(seat => !bookedIds.has(seat.id))) {
         return slot; // 找到最早有空位的時段
       }
     }
@@ -490,10 +506,12 @@
     if (!sb) return;
 
     try {
-      const [{ data: seats, error: sErr }, { data: booked, error: bErr }, { data: blocked, error: kErr }] = await Promise.all([
+      const [{ data: seats, error: sErr }, { data: booked, error: bErr },
+        { data: blocked, error: kErr }, {data: cameraAlerts, error: aErr}] = await Promise.all([
         sb.from("seats").select("id,seat_no,is_active").eq("room_code", room).order("seat_no"),
         sb.rpc("get_booked_seat_ids", { p_room_code: room, p_date: date, p_start_time: time + ":00" }),
-        sb.from("blocked_slots").select("id").eq("room_code", room).eq("reservation_date", date).eq("start_time", time + ":00")
+        sb.from("blocked_slots").select("id").eq("room_code", room).eq("reservation_date", date).eq("start_time", time + ":00"),
+        sb.from("camera_alerts").select("id,seat_id,object_type").eq("room_code", room).eq("status", "open")
       ]);
 
       // 若在此期間有更新的查詢發起，立即丟棄此過期回應，確保只顯示最新條件
@@ -502,12 +520,13 @@
         return;
       }
 
-      if (sErr || bErr || kErr) throw sErr || bErr || kErr;
+      if (sErr || bErr || kErr || aErr) throw sErr || bErr || kErr || aErr;
 
       const newSeatView = {
         room,
         seats: seats || [],
         bookedSet: new Set((booked || []).map(x => x.seat_id)),
+        alertMap: new Map((cameraAlerts || []).map(a => [a.seat_id, a])),
         isBlocked: (blocked || []).length > 0
       };
 
@@ -533,7 +552,7 @@
     }
   }
 
-  const isBookable = (seat, view) => seat.is_active && !view.bookedSet.has(seat.id) && !view.isBlocked;
+  const isBookable = (seat, view) => seat.is_active && !view.bookedSet.has(seat.id) && !view.isBlocked && !view.alertMap?.has(seat.id);
   const bookableSeats = () => seatView ? seatView.seats.filter(s => isBookable(s, seatView)) : [];
 
   function syncFilter() {
@@ -561,7 +580,7 @@
     if (!design) return;
 
     const available = bookableSeats().length;
-    const activeCount = seats.filter(seat => seat.is_active).length;
+    const activeCount = seats.filter(seat => seat.is_active && !seatView.alertMap?.has(seat.id)).length;
     $("availability-count").textContent = isBlocked ? "此時段已封鎖" : `可登記 ${available} / ${activeCount} 席`;
     const expected = ROOM_TOTALS[room];
     showEmpty(seats.length < expected
@@ -690,12 +709,15 @@
       const no = Number(button.dataset.seatNo);
       const actual = seatsByNo.get(no);
       const booked = !!actual && seatView.bookedSet.has(actual.id);
+      const cameraAlert = actual ? seatView.alertMap?.get(actual.id) : null;
       const available = !!actual && isBookable(actual, seatView);
       const selected = selectedPreviewNo === no;
-      const state = !actual ? "未建置" : !actual.is_active ? "停用" : seatView.isBlocked ? "封鎖" : booked ? "已登記" : "可登記";
+      const state = !actual ? "未建置" : !actual.is_active ? "停用" : seatView.isBlocked ? "封鎖"
+        : cameraAlert ? "偵測到物品異常，已通報館員" : booked ? "已登記" : "可登記";
       button.classList.toggle("seat-missing", !actual);
       button.classList.toggle("seat-offline", !!actual && (!actual.is_active || seatView.isBlocked));
       button.classList.toggle("seat-occupied", booked);
+      button.classList.toggle("seat-anomaly", !!cameraAlert);
       button.classList.toggle("seat-open", available);
       button.classList.toggle("is-selected", selected);
       button.classList.toggle("is-dimmed", emphasize && !available);
@@ -709,17 +731,43 @@
         person.innerHTML = '<i class="person-head"></i><i class="person-body"></i>';
         model.appendChild(person);
       } else if (!booked && reader) reader.remove();
+      const modelObject = model.querySelector(".detected-object");
+      if (cameraAlert && !button.classList.contains("seat-form-workbench")) {
+        if (!modelObject || !modelObject.classList.contains(`object-${cameraAlert.object_type}`)) {
+          if (modelObject) modelObject.remove();
+          model.appendChild(createDetectedObject(cameraAlert.object_type));
+        }
+      } else if (modelObject) modelObject.remove();
     }
     for (const place of $("floorplan").querySelectorAll(".bench-place")) {
       const no = Number(place.dataset.benchSeat);
       const seat = seatsByNo.get(no);
       const booked = !!seat && seatView.bookedSet.has(seat.id);
+      const cameraAlert = seat ? seatView.alertMap?.get(seat.id) : null;
       place.classList.toggle("is-booked", booked);
+      place.classList.toggle("is-anomaly", !!cameraAlert);
+      const existingObject = place.querySelector(".detected-object");
+      if (cameraAlert) {
+        if (!existingObject || !existingObject.classList.contains(`object-${cameraAlert.object_type}`)) {
+          if (existingObject) existingObject.remove();
+          place.appendChild(createDetectedObject(cameraAlert.object_type));
+        }
+      } else if (existingObject) existingObject.remove();
       place.classList.toggle("is-selected", selectedPreviewNo === no);
       place.classList.toggle("is-offline", !seat || !seat.is_active || seatView.isBlocked);
     }
   }
 
+
+  function createDetectedObject(kind) {
+    const item = document.createElement("span");
+    item.className = `detected-object object-${kind === "books" ? "books" : "bag"}`;
+    item.setAttribute("aria-hidden", "true");
+    item.innerHTML = kind === "books"
+      ? '<i class="book-bottom"></i><i class="book-top"></i>'
+      : '<i class="bag-handle"></i><i class="bag-body"></i><i class="bag-pocket"></i>';
+    return item;
+  }
 
   // --- 預約摘要面板更新 ---
 
@@ -744,11 +792,17 @@
     $("seat-inspector").classList.toggle("hidden", !config);
     if (config) {
       const booked = !!seat && seatView.bookedSet.has(seat.id);
+      const alert = seat ? seatView.alertMap?.get(seat.id) : null;
       const status = !seat ? "未建置" : !seat.is_active ? "停用"
-        : seatView.isBlocked ? "時段封鎖" : booked ? "已登記" : "可登記";
+        : seatView.isBlocked ? "時段封鎖" : alert ? "物品異常・已通報館員"
+        : booked ? "已登記" : "可登記";
+      $("vision-seat-status").classList.toggle("hidden", !alert);
+      $("vision-seat-status").textContent = alert
+        ? `模擬偵測到${alert.object_type === "books" ? "書籍" : "背包"}，但系統顯示空位；已向管理員發出異常通報。排除前暫停登記。`
+        : "";
       $("inspection-status").textContent = status;
       $("inspection-status").dataset.status = !seat || !seat.is_active || seatView.isBlocked
-        ? "offline" : booked ? "booked" : "available";
+        ? "offline" : alert ? "alert" : booked ? "booked" : "available";
       $("inspection-code").textContent = config.code;
       $("issue-seat").value = seat?.id || "";
       $("report-reveal").classList.toggle("hidden", !seat);
@@ -756,6 +810,8 @@
     } else {
       $("issue-seat").value = "";
       $("issue-form").classList.add("hidden");
+      $("vision-seat-status").classList.add("hidden");
+      $("vision-seat-status").textContent = "";
     }
     $("confirm-booking").disabled = !canBook;
     $("summary-hint").textContent = !config ? "點選座位查看資訊。"
@@ -791,6 +847,8 @@
       selectedPreviewNo = null;
       notify(e.message?.includes("SLOT_TAKEN")
         ? "手慢了一步，座位剛被其他讀者預約，請重新選位。"
+        : e.message?.includes("SEAT_ANOMALY_OPEN")
+        ? "偵測到疑似占位物品，暫停登記，待管理員排除後才能使用。"
         : e.message?.includes("SLOT_BLOCKED")
         ? "此時段已被館員封鎖，請改選其他時段。"
         : e.message?.includes("DATE_RANGE")
@@ -951,7 +1009,7 @@
   async function loadAdmin() {
     if (profile?.role !== "librarian") return;
     updateAdminSeatState();
-    await Promise.all([loadAdminReservations(), loadBlockedSlots(), loadIssueReports()]);
+    await Promise.all([loadAdminReservations(), loadBlockedSlots(), loadIssueReports(), loadCameraAlerts()]);
   }
 
   function getAdminFilters() {
