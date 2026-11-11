@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { endTime, reservationCsvRows, toCsv } = require("../app-utils.js");
+const { endTime, reservationCsvRows, reservationTimeState, toCsv } = require("../app-utils.js");
 
 test("CSV quotes Traditional Chinese, commas, quotes, and line breaks", () => {
   const csv = toCsv(
@@ -48,4 +48,19 @@ test("reservation CSV rows contain only the six requested non-identifying fields
     "B1 自習室 C 區", "10", "2026-11-07", "20:00", "21:00", "已確認"
   ]]);
   assert.equal(rows[0].length, 6);
+});
+
+test("reservation actions disappear at Taipei-local start, remain hidden while active and after end", () => {
+  assert.equal(reservationTimeState("2026-11-11","20:00:00",
+    {dateStr:"2026-11-11",hour:19,minute:59}),"future");
+  assert.equal(reservationTimeState("2026-11-11","20:00:00",
+    {dateStr:"2026-11-11",hour:20,minute:0}),"active");
+  assert.equal(reservationTimeState("2026-11-11","20:00:00",
+    {dateStr:"2026-11-11",hour:20,minute:59}),"active");
+  assert.equal(reservationTimeState("2026-11-11","20:00:00",
+    {dateStr:"2026-11-11",hour:21,minute:0}),"ended");
+  assert.equal(reservationTimeState("2026-11-10","20:00:00",
+    {dateStr:"2026-11-11",hour:9,minute:0}),"ended");
+  assert.equal(reservationTimeState("2026-11-12","09:00:00",
+    {dateStr:"2026-11-11",hour:21,minute:0}),"future");
 });
