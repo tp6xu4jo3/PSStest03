@@ -813,8 +813,8 @@
         ? "offline" : alert ? "alert" : booked ? "booked" : "available";
       $("inspection-code").textContent = config.code;
       $("issue-seat").value = seat?.id || "";
-      $("report-reveal").classList.toggle("hidden", !seat);
-      if (!seat) $("issue-form").classList.add("hidden");
+      $("report-reveal").classList.toggle("hidden", !seat || !!alert);
+      if (!seat || alert) $("issue-form").classList.add("hidden");
     } else {
       $("issue-seat").value = "";
       $("issue-form").classList.add("hidden");
@@ -1293,6 +1293,10 @@
         ? "該時段已有人登記，不符合「空位卻有物品」的異常條件。"
         : message.includes("SEAT_NOT_FOUND")
         ? "座位資料尚未建立，請先執行座位SQL。"
+        : message.includes("SEAT_DISABLED")
+        ? "這個座位已停用，無法產生模擬偵測。"
+        : message.includes("DATE_RANGE") || message.includes("TIME_RANGE")
+        ? "模擬日期需在7天內，時段需為09:00–21:00的整點。"
         : "模擬偵測無法完成，請先在Supabase執行攝影機異常SQL。");
     } finally { setBusy(button, false, "模擬偵測並比對"); }
   }
