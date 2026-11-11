@@ -1,0 +1,22 @@
+name: One-time delete non-main branches
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  delete-extra-branches:
+    if: github.repository == 'tp6xu4jo3/PSStest03'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove V0 and old feature branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/V0"
+          gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/feature/ntut-b1-library-prototype"
