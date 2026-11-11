@@ -155,7 +155,7 @@ grant execute on function public.is_librarian() to authenticated;
 -- 請勿把 service_role key 放進前端。
 
 
--- 註冊防濫用：Edge Function 以 IP SHA-256 雜湊值計數，不保存原始 IP。
+-- 註冊防濫用：沿用欄位名 ip_hash，實際存放虛構測試編號的 SHA-256 雜湊；每筆每小時最多5次。
 create table if not exists public.registration_attempts (
   ip_hash text primary key,
   window_started_at timestamptz not null default now(),

@@ -119,6 +119,5 @@ body{background-image:radial-gradient(ellipse at 85% 0%,#42202a 0,transparent 44
 .issue-form .secondary-button{grid-column:1/-1;max-width:240px}
 .issue-form select:focus,.issue-form textarea:focus{outline:2px solid var(--cyan);outline-offset:1px}
 .report-details{max-width:260px;min-width:180px;white-space:normal;line-height:1.6;overflow-wrap:anywhere}
-#turnstile-container{min-height:0}
 @media(max-width:1100px){.prototype-notice,.issue-panel{margin-left:5vw;margin-right:5vw}}
 @media(max-width:520px){.ntut-seat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.ntut-seat-grid .seat{min-height:76px}.issue-form{grid-template-columns:1fr}.issue-form .secondary-button{max-width:none}.prototype-notice{padding:14px}.issue-panel{padding:20px 16px}}

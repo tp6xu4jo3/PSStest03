@@ -12,7 +12,7 @@
 ├─ styles.css                    介面樣式
 ├─ app.js                        座位、登入、回報及管理流程
 ├─ app-utils.js                  CSV安全逸出、匯出欄位與時間格式
-├─ config.js                     Supabase公開連線設定與Turnstile公開Site Key
+├─ config.js                     Supabase公開連線設定
 ├─ README.md                     本說明（唯一Markdown檔）
 ├─ .gitignore
 ├─ supa/
@@ -33,8 +33,8 @@
 1. **現有資料庫：** Supabase → SQL Editor，執行 [`supa/migrations/20261111_ntut_b1_demo.sql`](supa/migrations/20261111_ntut_b1_demo.sql)。它擴充原有資料表並建立B1示範座位與`seat_reports`，不會刪除舊資料。
 2. **全新資料庫：**先執行 [`supa/setup.sql`](supa/setup.sql)，再執行前述增量SQL。舊版初始化內容保留作為新資料庫的結構前置。
 3. **註冊Function：**Supabase → Edge Functions → `register-student`，部署 [`supa/functions/register-student/index.ts`](supa/functions/register-student/index.ts)。
-4. **人機驗證：**在Cloudflare Turnstile建立站台，取得Site Key與Secret Key；將公開Site Key填在根目錄`config.js`的`TURNSTILE_SITE_KEY`；至Supabase → Edge Functions → Secrets設定`TURNSTILE_SECRET_KEY`，建議加設`TURNSTILE_ALLOWED_HOSTNAMES`為實際站台hostname（例如`tp6xu4jo3.github.io`）。
-5. **安全提醒：**Secret Key及Service Role Key不可放在GitHub前端檔案。原型帳號使用虛構9位數測試編號，不可當作北科大校務登入。
+4. **無需其他第三方設定：**註冊只使用原有的Supabase Auth、Edge Function與Postgres限流函式`allow_registration_attempt`（位於`supa/setup.sql`）；新的Edge Function會對同一虛構測試編號每小時限制5次註冊嘗試，僅保存識別碼雜湊。更新Edge Function後即不需要額外驗證服務或其金鑰。
+5. **安全提醒：**不得把Supabase Service Role Key放進前端。此註冊方式沒有真人驗證，使用者可更換編號，限流不能完全阻止大量自動註冊；僅供教學原型，公開正式服務需另行評估安全性。原型帳號不能當作北科大校務登入。
 
 ### 以Supabase CLI部署Function
 
@@ -64,7 +64,7 @@ group by room_code order by room_code;
 
 ## 檢查與測試
 
-- 先完成SQL、Function及Turnstile設定，才能正常使用新分區與回報功能。
+- 先完成SQL與Edge Function部署，才能正常使用新分區、註冊與回報功能；不需要其他第三方設定。
 - 同座位同時段避免重複登記，操作後可取消。
 - 一般使用者可回報座位遭占用、設備異常等狀況；僅原型管理員可檢視全部並結案。
 - `tests/app-utils.test.js`用來驗證CSV特殊字元、公式注入防護、時間格式與匯出欄位不含學號等識別資料。若已安裝Node.js，可執行`node --test tests/app-utils.test.js`。

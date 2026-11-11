@@ -14,7 +14,6 @@
   <link rel="stylesheet" href="styles.css">
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   <script defer src="app-utils.js"></script>
   <script defer src="app.js"></script>
 </head>
@@ -118,7 +117,7 @@
   <div id="auth-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title">
     <div class="modal-card panel"><button class="modal-close" id="auth-close" aria-label="關閉">×</button><span class="eyebrow">MEMBER ACCESS</span><h2 id="auth-title">原型測試帳號</h2><p class="modal-desc">僅供教學模擬，請勿輸入真實學號或慣用密碼；帳號並不驗證北科大身分。</p>
       <div class="tabs"><button class="tab active" data-auth="login">登入</button><button class="tab" data-auth="register">建立帳號</button></div>
-      <form id="auth-form"><label>9 位數虛構測試編號<input id="student-id" inputmode="numeric" pattern="[0-9]{9}" maxlength="9" placeholder="例：001123456" required></label><label>密碼<input id="password" type="password" minlength="8" autocomplete="current-password" placeholder="至少 8 個字元" required></label><div id="turnstile-container" class="hidden" aria-label="註冊人機驗證"></div><button class="primary-button" id="auth-submit">登入 <span>↗</span></button></form>
+      <form id="auth-form"><label>9 位數虛構測試編號<input id="student-id" inputmode="numeric" pattern="[0-9]{9}" maxlength="9" placeholder="例：001123456" required></label><label>密碼<input id="password" type="password" minlength="8" autocomplete="current-password" placeholder="至少 8 個字元" required></label><button class="primary-button" id="auth-submit">登入 <span>↗</span></button></form>
       <p class="fineprint">測試編號格式：前三碼 000–115，其餘六碼自訂。不可當成校方登入。</p>
     </div>
   </div>

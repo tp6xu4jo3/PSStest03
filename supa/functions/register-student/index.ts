@@ -17,7 +17,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "僅接受 POST 請求。" }, 405);
 
-  let body: { student_id?: unknown; password?: unknown; turnstile_token?: unknown };
+  let body: { student_id?: unknown; password?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -26,7 +26,6 @@ Deno.serve(async (req: Request) => {
 
   const studentId = typeof body.student_id === "string" ? body.student_id.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
-  const turnstileToken = typeof body.turnstile_token === "string" ? body.turnstile_token : "";
 
   // 僅用虛構測試識別碼；不是北科大校方學號驗證。
   if (!/^(?:0[0-9]{2}|10[0-9]|11[0-5])[0-9]{6}$/.test(studentId)) {
@@ -34,31 +33,6 @@ Deno.serve(async (req: Request) => {
   }
   if (password.length < 8 || password.length > 72) {
     return json({ error: "密碼長度需為 8–72 個字元。" }, 400);
-  }
-
-  // 驗證在伺服器完成，不能只信任前端 token，也不能公開 Secret Key。
-  const turnstileSecret = Deno.env.get("TURNSTILE_SECRET_KEY");
-  if (!turnstileSecret) return json({ error: "註冊防護尚未設定，暫停開放註冊。" }, 503);
-  if (!turnstileToken) return json({ error: "請先完成人機驗證。" }, 400);
-
-  try {
-    const verifyResponse = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      body: new URLSearchParams({ secret: turnstileSecret, response: turnstileToken }),
-    });
-    if (!verifyResponse.ok) throw new Error("siteverify HTTP error");
-    const verifyResult = await verifyResponse.json() as { success?: boolean; hostname?: string };
-    if (verifyResult.success !== true) return json({ error: "人機驗證未通過，請重新驗證。" }, 403);
-
-    // 建議設定 TURNSTILE_ALLOWED_HOSTNAMES（逗號分隔），限制能註冊的正式來源。
-    const allowList = (Deno.env.get("TURNSTILE_ALLOWED_HOSTNAMES") || "")
-      .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
-    if (allowList.length && !allowList.includes((verifyResult.hostname || "").toLowerCase())) {
-      return json({ error: "不允許從這個網域建立測試帳號。" }, 403);
-    }
-  } catch (error) {
-    console.error("Turnstile siteverify failed:", error);
-    return json({ error: "人機驗證服務暫時無法使用。" }, 503);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -72,6 +46,24 @@ Deno.serve(async (req: Request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // 不需額外服務：沿用 setup.sql 的 Supabase Postgres 原子限流 RPC。
+  // 每個虛構測試編號每小時最多 5 次註冊嘗試，僅存 SHA-256 雜湊。
+  // 此方法不等同驗證真人，無法防止有人換用大量不同編號，僅適合教學原型。
+  const digest = await crypto.subtle.digest(
+    "SHA-256", new TextEncoder().encode("ntut-demo-register:" + studentId)
+  );
+  const hash = Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, "0")).join("");
+  const { data: allowed, error: limitError } = await admin.rpc("allow_registration_attempt", {
+    p_ip_hash: "id:" + hash
+  });
+  if (limitError) {
+    console.error("Registration rate limiter unavailable:", limitError.message);
+    return json({ error: "註冊限流功能未啟用，請檢查 Supabase setup.sql。" }, 503);
+  }
+  if (allowed !== true) {
+    return json({ error: "此測試編號的註冊嘗試過於頻繁，請稍後再試。" }, 429);
+  }
+
   // 先檢查 profiles，資料庫 UNIQUE 約束及 Auth 本身也會防止重複帳號。
   const { data: existingProfile, error: profileLookupError } = await admin
     .from("profiles")
@@ -81,10 +73,10 @@ Deno.serve(async (req: Request) => {
 
   if (profileLookupError) {
     console.error("Profile lookup failed:", profileLookupError.message);
-    return json({ error: "目前無法檢查學號，請稍後再試。" }, 500);
+    return json({ error: "目前無法檢查測試編號，請稍後再試。" }, 500);
   }
   if (existingProfile) {
-    return json({ error: "此學號已註冊，請直接登入。" }, 409);
+    return json({ error: "此測試編號已註冊，請直接登入。" }, 409);
   }
 
   const email = `${studentId}@students.library.invalid`;
@@ -98,7 +90,7 @@ Deno.serve(async (req: Request) => {
   if (createError || !created.user) {
     const message = createError?.message?.toLowerCase() ?? "";
     if (message.includes("already") || message.includes("duplicate") || message.includes("exists")) {
-      return json({ error: "此學號已註冊，請直接登入。" }, 409);
+      return json({ error: "此測試編號已註冊，請直接登入。" }, 409);
     }
     console.error("Auth user creation failed:", createError?.message);
     return json({ error: "建立帳號失敗，請稍後重試。" }, 500);
