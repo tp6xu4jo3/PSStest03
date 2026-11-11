@@ -276,7 +276,7 @@
     clearTimeout(remoteDebounceTimer);
     remoteDebounceTimer = setTimeout(() => {
       refreshSeats({ isBackground: true });
-      if (currentView === "mine") loadMine();
+      if (currentView === "mine") { loadMine(); loadMyReports(); }
       if (currentView === "admin") loadAdmin();
     }, 200);
   }
@@ -467,7 +467,7 @@
     document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
     $(`${name}-view`).classList.remove("hidden");
     document.querySelectorAll("[data-view]").forEach(b => b.classList.toggle("active", b.dataset.view === name));
-    if (name === "mine") loadMine();
+    if (name === "mine") { loadMine(); loadMyReports(); }
     if (name === "admin") {
       if (profile?.role !== "librarian") {
         notify("此頁面僅限館員使用。");
@@ -863,6 +863,38 @@
   }
 
   // --- 我的預約與行事曆下載 (.ics Export) ---
+  async function loadMyReports() {
+    const target = $("my-reports");
+    if (!session) {
+      target.innerHTML = '<div class="empty">登入後可查看自己提交的回報。</div>';
+      return;
+    }
+    const viewer = session.user.id;
+    target.textContent = "載入中…";
+    const {data, error} = await sb.from("seat_reports")
+      .select("id,room_code,issue_type,status,created_at,seats(seat_no)")
+      .eq("reported_by",viewer).order("created_at",{ascending:false}).limit(50);
+    if (session?.user.id !== viewer) return;
+    if (error) {
+      console.error(error);
+      target.textContent = "回報紀錄無法載入，請確認資料庫已設定。";
+      return;
+    }
+    if (!data?.length) {
+      target.innerHTML = '<div class="empty">尚未提交任何問題回報。</div>';
+      return;
+    }
+    const names = {occupied:"座位遭占用", equipment:"設備異常", mismatch:"座位資訊不符", other:"其他"};
+    target.innerHTML = `<table>
+      <thead><tr><th>提交時間</th><th>座位</th><th>問題</th><th>狀態</th></tr></thead>
+      <tbody>${data.map(item => `<tr>
+        <td>${esc(new Date(item.created_at).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}))}</td>
+        <td>${esc(DESIGNS[item.room_code]?.code||"")}${String(item.seats?.seat_no||"").padStart(2,"0")}</td>
+        <td>${esc(names[item.issue_type]||item.issue_type)}</td>
+        <td>${item.status === "resolved" ? "已處理" : "待處理"}</td>
+      </tr>`).join("")}</tbody></table>`;
+  }
+
   async function loadMine() {
     if (!session) {
       $("my-reservations").innerHTML = '<div class="empty">請先登入，查看你的預約紀錄。</div>';
@@ -1330,7 +1362,7 @@
       $("issue-details").value = "";
       $("issue-form").classList.add("hidden");
       $("report-reveal").setAttribute("aria-expanded","false");
-      notify("模擬回報已記錄；不會送至北科大圖書館。");
+      notify("回報已送出原型管理員，可在「我的登記」查看處理狀態。");
     } catch (err) {
       console.error(err);
       notify(err.code === "23505" ? "相同問題尚未結案，無須重複回報。"
