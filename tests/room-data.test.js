@@ -63,3 +63,22 @@ test("walking characters have valid bounded travel paths", () => {
     });
   }
 });
+
+
+test("Discipline tables each have one continuous tabletop and five aligned stations", () => {
+  const room = designs.b1c;
+  const tables = room.decor.filter(item => item.type === "workbench");
+  assert.equal(tables.length, 4);
+  assert.equal(new Set(tables.map(table => table.id)).size, 4);
+  for (const table of tables) {
+    const seats = room.seats.filter(seat => seat.benchId === table.id);
+    assert.equal(seats.length, 5);
+    assert.deepEqual(seats.filter(seat => seat.side === "north").map(seat => seat.slot), [0, 1, 2]);
+    assert.deepEqual(seats.filter(seat => seat.side === "south").map(seat => seat.slot), [0, 1]);
+    for (const seat of seats) {
+      assert.ok(Math.abs(seat.x - table.x) < table.width / 2);
+      assert.ok(Math.abs(seat.y - table.y) < 15);
+      assert.equal(seat.facing, seat.side);
+    }
+  }
+});
