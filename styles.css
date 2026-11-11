@@ -85,3 +85,40 @@
 @media(max-width:850px){.admin-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.floor2-body{grid-template-columns:minmax(0,1fr) 30px minmax(0,1fr);gap:8px}}
 @media(max-width:520px){.admin-actions{gap:8px}.admin-action-button{height:34px;padding:0 9px;font-size:10px}.admin-filters{grid-template-columns:1fr}.floor2-body{grid-template-columns:1fr;gap:10px}.floor2-central-tables{display:grid;grid-template-columns:1fr 1fr;gap:8px}.floor2-walkway{height:24px;min-height:0;flex-direction:row;padding:2px 8px}.floor2-seat-grid{gap:5px}.floor2-table-group{padding:10px}}
 
+
+
+/* NTUT B1 seat-service research prototype (not official identity) */
+:root{--cyan:#ff8274;--green:#8bc6b4;--gold:#ffd8a6}
+body{background-image:radial-gradient(ellipse at 85% 0%,#42202a 0,transparent 44%),linear-gradient(130deg,#101a24,#111f2c 60%,#171f2a)}
+.brand-mark{transform:none;border-color:var(--cyan);color:var(--cyan);border-radius:3px;font:600 15px "Noto Sans TC"}
+.topbar .brand{letter-spacing:.05em}
+.live-dot{background:var(--cyan);box-shadow:0 0 9px #ff827455}
+.prototype-notice{max-width:1260px;margin:0 auto 24px;padding:18px 24px;border:1px solid #76514f;border-left:4px solid var(--cyan);border-radius:5px;background:#2a2430;color:var(--text);font-size:12px;line-height:1.85}
+.prototype-notice strong{font-size:14px}
+.prototype-notice p{margin:8px 0;color:#c5cbd1}
+.prototype-links{display:flex;flex-wrap:wrap;gap:18px}
+.prototype-links a{color:#ffc1b7;text-underline-offset:3px}
+.floorplan:has(.ntut-demo-map){display:block;min-width:0;max-width:none;padding:0;background:transparent;border:0}
+.ntut-demo-map{padding:6px}
+.ntut-map-caption{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:0 0 14px;margin-bottom:14px}
+.ntut-map-caption strong{font-size:15px}
+.ntut-map-caption span{font-size:10px;color:var(--muted)}
+.ntut-seat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px}
+.ntut-seat-grid .seat{min-width:0;min-height:90px;padding:11px}
+.ntut-seat-grid .seat-tag{font-size:9px}
+.ntut-seat-grid .seat-header{flex-wrap:wrap;gap:5px}
+.ntut-seat-grid .seat.booked{cursor:not-allowed}
+.issue-panel{max-width:1260px;margin:18px auto 60px;padding:24px 28px}
+.issue-panel p{color:var(--muted);font-size:12px;line-height:1.9;max-width:820px}
+.issue-form{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px}
+.issue-form label{display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--muted)}
+.issue-form .issue-wide{grid-column:1/-1}
+.issue-form select,.issue-form textarea{width:100%;background:#0a1926;border:1px solid #344d60;border-radius:4px;color:var(--text);font:12px "Noto Sans TC";padding:11px}
+.issue-form select{min-height:42px}
+.issue-form textarea{min-height:68px;resize:vertical}
+.issue-form .secondary-button{grid-column:1/-1;max-width:240px}
+.issue-form select:focus,.issue-form textarea:focus{outline:2px solid var(--cyan);outline-offset:1px}
+.report-details{max-width:260px;min-width:180px;white-space:normal;line-height:1.6;overflow-wrap:anywhere}
+#turnstile-container{min-height:0}
+@media(max-width:1100px){.prototype-notice,.issue-panel{margin-left:5vw;margin-right:5vw}}
+@media(max-width:520px){.ntut-seat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.ntut-seat-grid .seat{min-height:76px}.issue-form{grid-template-columns:1fr}.issue-form .secondary-button{max-width:none}.prototype-notice{padding:14px}.issue-panel{padding:20px 16px}}
