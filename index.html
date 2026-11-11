@@ -28,55 +28,84 @@
   <main>
     <section class="intro">
       <div class="eyebrow"><span class="live-dot"></span> RESEARCH PROTOTYPE · NOT AN OFFICIAL SERVICE</div>
-      <div class="intro-row"><div><h1>找到座位，<em>少一點來回。</em></h1><p>以北科大 B1 自習室為情境，改善選位、確認與占位回報體驗。</p></div><div class="date-stamp"><span>TAIPEI TIME</span><strong id="today-label">----</strong><small>GMT+8 · Asia/Taipei</small></div></div>
+      <div class="intro-row"><div><h1>讓專注，<em>有自己的空間。</em></h1><p>在三間不同性格的自習包廂之間，找到你的理想座位。</p></div><div class="date-stamp"><span>TAIPEI TIME</span><strong id="today-label">----</strong><small>GMT+8 · Asia/Taipei</small></div></div>
     </section>
 
-    <section class="prototype-notice" aria-label="服務範圍及資料說明">
-      <strong>教學研究展示｜非圖書館官方服務</strong>
-      <p>北科大校方統計 B1 自習室分為 A／B／C 三區、共 275 席。本網站僅建立每區 12 席（共 36 席）<b>示範資料</b>，編號、座位狀態、時段與登記結果均非官方資料，不能用於實際占位或登記。</p>
-      <div class="prototype-links"><a href="https://irsdc.ntut.edu.tw/p/426-1145-10.php?Lang=zh-tw" target="_blank" rel="noopener noreferrer">校方空間資料</a><a href="https://library.ntut.edu.tw/p/412-1024-2675.php" target="_blank" rel="noopener noreferrer">圖書館使用規則</a><a href="https://www.youtube.com/watch?v=zVJRqAjdLpM" target="_blank" rel="noopener noreferrer">館方登記教學影片</a></div>
+    <section class="prototype-notice" aria-label="原型使用說明">
+      <strong>概念設計情境 · 非北科大圖書館官方服務</strong>
+      <p>設定為額外新建的A／B／C三間主題包廂自習室；平面配置、座位設備、預約狀態及畫面人物都是設計提案，並非館方真實資訊。座位登記與異常回報只寫入本原型資料庫。</p>
     </section>
 
     <section id="booking-view" class="view">
-      <div class="controls panel">
-        <label>閱覽室<select id="room-select"><option value="b1a">B1 自習室 A 區</option><option value="b1b">B1 自習室 B 區</option><option value="b1c">B1 自習室 C 區</option></select></label>
-        <label>模擬日期<input id="date-select" type="date"></label>
-        <label>模擬時段<select id="slot-select"></select></label>
-        <label class="filter-toggle"><input id="bookable-only" type="checkbox" disabled><span>只看可選座位</span></label>
-        <div class="availability-note"><span class="live-dot"></span><span id="availability-count">載入示範資料中…</span></div>
-      </div>
-      <div class="workspace">
-        <section class="map-panel panel">
-          <div class="section-heading"><div><span class="eyebrow">B1 ZONES / DEMO</span><h2>座位配置</h2></div><span class="floor-tag">B1 · 示意配置</span></div>
-          <div class="legend">
-            <span><i class="key available"></i>空位</span><span><i class="key booked"></i>已預約</span><span><i class="key disabled"></i>停用</span><span><i class="key selected"></i>已選取</span>
-            <span style="color:#395466;margin:0 4px">|</span>
-            <span style="color:var(--muted)">🪟 座位編號及設備均為示意</span>
+      <div class="room-portal panel" id="room-portal">
+        <div class="portal-copy">
+          <span class="eyebrow">THREE ROOMS · ONE FOCUS</span>
+          <h2 id="room-headline">Cozy <em>Room</em></h2>
+          <p id="room-description">像自己的閱讀角落，木質桌面、綠意與柔和光線構成安靜的包廂。</p>
+          <span id="room-subtitle" class="room-subtitle">溫柔明亮・留一點餘裕</span>
+        </div>
+        <div class="portal-controls">
+          <span class="portal-label">SELECT YOUR ATMOSPHERE</span>
+          <div class="room-tabs" role="group" aria-label="切換包廂自習室">
+            <button class="room-tab is-active" type="button" data-room="b1a" aria-pressed="true"><span class="room-letter">A</span><span><strong>Cozy</strong><small>舒適閱讀</small></span></button>
+            <button class="room-tab" type="button" data-room="b1b" aria-pressed="false"><span class="room-letter">B</span><span><strong>Sleepy</strong><small>沉靜思緒</small></span></button>
+            <button class="room-tab" type="button" data-room="b1c" aria-pressed="false"><span class="room-letter">C</span><span><strong>Discipline</strong><small>高度專注</small></span></button>
           </div>
-          <div class="floorplan-wrap"><div class="floorplan" id="floorplan"><div class="loading">正在讀取座位資料…</div></div></div>
+        </div>
+      </div>
+
+      <div class="controls panel controls-compact">
+        <label class="room-select-control">包廂<select id="room-select"><option value="b1a">A · Cozy Room</option><option value="b1b">B · Sleepy Room</option><option value="b1c">C · Discipline Room</option></select></label>
+        <label>日期<input id="date-select" type="date"></label>
+        <label>時段<select id="slot-select"></select></label>
+        <label class="filter-toggle"><input id="bookable-only" type="checkbox" disabled><span>凸顯可選座位</span></label>
+        <div class="availability-note"><span class="live-dot"></span><span id="availability-count">正在同步座位…</span></div>
+      </div>
+
+      <div class="workspace experience-grid">
+        <section class="map-panel panel">
+          <div class="section-heading room-map-heading">
+            <div><span class="eyebrow">ISOMETRIC ROOM EXPLORER / B1</span><h2><span id="map-room-title">Cozy Room</span> <small id="map-room-code">01 / 03</small></h2></div>
+            <span class="floor-tag">2.5D · 斜角空拍</span>
+          </div>
+          <div class="legend">
+            <span><i class="key available"></i>可登記</span>
+            <span><i class="key booked"></i>已登記</span>
+            <span><i class="key disabled"></i>停用</span>
+            <span><i class="key selected"></i>已選取</span>
+          </div>
+          <div class="scene-viewport" id="scene-viewport">
+            <div class="scene-stage">
+              <div class="floorplan" id="floorplan" aria-label="包廂座位互動模型"><div class="loading">正在建立房間…</div></div>
+            </div>
+            <span class="scene-compass" aria-hidden="true">N / 45°</span>
+            <span class="scene-note">人物為動態裝飾，已登記不等於現場有人</span>
+          </div>
           <div id="empty-state" class="empty-state hidden" role="status"><p id="empty-message"></p><button id="clear-filter" class="secondary-button" type="button">清除篩選</button></div>
-          <div class="map-foot"><span>點選模擬空位，練習座位登記</span><span>本區示範席數 <b id="room-total-seats">12</b> 席</span></div>
+          <div class="map-foot"><span>點選任一座位查看設備、狀態與回報功能</span><span>本包廂座位 <b id="room-total-seats">12</b> 席</span></div>
         </section>
+
         <aside class="summary panel" id="summary">
-          <span class="eyebrow">YOUR DEMO SELECTION</span><h2>登記摘要</h2>
+          <div class="inspector-top"><span class="eyebrow">SEAT CONCIERGE</span><span class="inspector-marker">● DETAILS</span></div>
+          <h2>座位詳情</h2>
           <div class="summary-seat"><span>選取座位</span><strong id="sum-seat">尚未選位</strong><div id="sum-features" class="summary-features"></div></div>
-          <dl><div><dt>閱覽室</dt><dd id="sum-room">北側閱覽室</dd></div><div><dt>分區配置</dt><dd id="sum-zone">—</dd></div><div><dt>日期</dt><dd id="sum-date">—</dd></div><div><dt>時段</dt><dd id="sum-slot">—</dd></div></dl>
-          <p class="hint" id="summary-hint">選擇示範空位，進行模擬登記。</p>
+          <dl><div><dt>包廂</dt><dd id="sum-room">A · Cozy Room</dd></div><div><dt>特色配置</dt><dd id="sum-zone">—</dd></div><div><dt>日期</dt><dd id="sum-date">—</dd></div><div><dt>時段</dt><dd id="sum-slot">—</dd></div></dl>
+          <div id="seat-inspector" class="seat-inspector hidden" aria-live="polite">
+            <div class="inspector-status-row"><span id="inspection-status" class="seat-state-pill">—</span><span id="inspection-code" class="seat-code-text">—</span></div>
+            <button id="report-reveal" type="button" class="report-reveal">回報此座位問題 <span aria-hidden="true">↗</span></button>
+            <form id="issue-form" class="issue-form hidden">
+              <input id="issue-seat" type="hidden">
+              <label>問題類型<select id="issue-type" required><option value="occupied">現場有人占位</option><option value="equipment">設備異常</option><option value="mismatch">狀態與現場不符</option><option value="other">其他問題</option></select></label>
+              <label>補充說明（選填）<textarea id="issue-details" maxlength="300" rows="3" placeholder="簡述狀況，不要提供姓名、學號或個資。"></textarea></label>
+              <button type="submit" id="issue-submit" class="secondary-button">送出原型回報</button>
+              <small class="fineprint">僅為原型紀錄，不會通知館方。</small>
+            </form>
+          </div>
+          <p class="hint" id="summary-hint">點選地圖上的座位，即可查看設備與狀態。</p>
           <button id="confirm-booking" class="primary-button" disabled>確認模擬登記 <span>↗</span></button>
-          <small class="fineprint">僅供流程測試 · 不會登記北科大真實座位</small>
+          <small class="fineprint">僅供互動展示，不代表北科大真實座位登記。</small>
         </aside>
       </div>
-      <section class="issue-panel panel" aria-labelledby="issue-title">
-      <div class="section-heading"><div><span class="eyebrow">SEAT ISSUE / DEMO</span><h2 id="issue-title">座位異常回報</h2></div><span class="floor-tag">模擬通報</span></div>
-      <p>遇到有人占位、設備損壞或座位資訊不一致？可以練習提報給原型管理員。這裡<b>不是北科大官方通報管道</b>；實際問題請依館方現行方式反映。</p>
-      <form id="issue-form" class="issue-form">
-        <label>示範座位<select id="issue-seat" required><option value="">請先選擇座位</option></select></label>
-        <label>問題類型<select id="issue-type" required><option value="occupied">座位遭占用</option><option value="equipment">設備異常</option><option value="mismatch">顯示與現場不一致</option><option value="other">其他問題</option></select></label>
-        <label class="issue-wide">補充說明（選填）<textarea id="issue-details" maxlength="300" rows="2" placeholder="簡述狀況，請勿輸入姓名、學號或其他個資。"></textarea></label>
-        <button type="submit" id="issue-submit" class="secondary-button">送出模擬回報</button>
-      </form>
-      <small class="fineprint">回報僅保存在本原型資料庫；同一使用者對同一示範座位的同類問題，未結案前只能回報一次。</small>
-      </section>
     </section>
 
     <section id="mine-view" class="view hidden">
@@ -87,13 +116,13 @@
     <section id="admin-view" class="view hidden">
       <div class="page-heading"><span class="eyebrow">LIBRARIAN / 03</span><h2>原型管理</h2><p>管理示範座位、模擬登記與使用者回報；不連接校方後台。</p></div>
       <div class="admin-grid">
-        <section class="panel admin-card"><h3>停用 / 啟用座位</h3><label>閱覽室<select id="admin-room"><option value="b1a">B1 自習室 A 區</option><option value="b1b">B1 自習室 B 區</option><option value="b1c">B1 自習室 C 區</option></select></label><label>座位<select id="admin-seat"></select></label><button id="toggle-seat" class="secondary-button">切換座位狀態</button></section>
-        <section class="panel admin-card"><h3>封鎖時段</h3><label>閱覽室<select id="block-room"><option value="b1a">B1 自習室 A 區</option><option value="b1b">B1 自習室 B 區</option><option value="b1c">B1 自習室 C 區</option></select></label><label>日期<input id="block-date" type="date"></label><label>時段<select id="block-slot"></select></label><label>原因<input id="block-reason" maxlength="120" placeholder="例：設備維護"></label><button id="block-submit" class="secondary-button">封鎖此時段</button></section>
+        <section class="panel admin-card"><h3>停用 / 啟用座位</h3><label>閱覽室<select id="admin-room"><option value="b1a">A · Cozy Room</option><option value="b1b">B · Sleepy Room</option><option value="b1c">C · Discipline Room</option></select></label><label>座位<select id="admin-seat"></select></label><p id="admin-seat-status" class="admin-seat-status" role="status">讀取座位狀態中…</p><div class="admin-seat-actions"><button id="disable-seat" class="secondary-button" type="button">停用座位</button><button id="enable-seat" class="secondary-button" type="button">啟用座位</button></div></section>
+        <section class="panel admin-card"><h3>封鎖時段</h3><label>閱覽室<select id="block-room"><option value="b1a">A · Cozy Room</option><option value="b1b">B · Sleepy Room</option><option value="b1c">C · Discipline Room</option></select></label><label>日期<input id="block-date" type="date"></label><label>時段<select id="block-slot"></select></label><label>原因<input id="block-reason" maxlength="120" placeholder="例：設備維護"></label><button id="block-submit" class="secondary-button">封鎖此時段</button></section>
       </div>
       <section class="panel admin-table">
         <div class="section-heading"><h3>預約紀錄</h3><div class="admin-actions"><button id="admin-export-csv" class="secondary-button admin-action-button">匯出 CSV</button><button id="admin-refresh" class="text-button">重新整理 ↻</button></div></div>
         <div class="admin-filters">
-          <label>閱覽室<select id="admin-filter-room"><option value="">全部館室</option><option value="b1a">B1 自習室 A 區</option><option value="b1b">B1 自習室 B 區</option><option value="b1c">B1 自習室 C 區</option></select></label>
+          <label>閱覽室<select id="admin-filter-room"><option value="">全部館室</option><option value="b1a">A · Cozy Room</option><option value="b1b">B · Sleepy Room</option><option value="b1c">C · Discipline Room</option></select></label>
           <label>日期起<input id="admin-filter-date-from" type="date"></label>
           <label>日期迄<input id="admin-filter-date-to" type="date"></label>
           <label>狀態<select id="admin-filter-status"><option value="">全部狀態</option><option value="confirmed">已確認</option><option value="cancelled">已取消</option></select></label>
