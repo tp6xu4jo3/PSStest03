@@ -1,110 +1,79 @@
-> **北科大 B1 改版中：** 本分支為教學研究原型，新增 A／B／C 示範座位及異常回報。**請先看 [README_NTUT.md](README_NTUT.md) 的Supabase更新步驟**；本頁以下是舊版「夜讀」說明，原設定不能視為北科大官方規則。
+# 北科大B1自習室｜座位服務設計原型
 
-# 夜讀・圖書館閱覽室座位預約
+> **教學研究原型，不是北科大圖書館的官方網站。** 不連接官方座位、門禁、校務登入或正式回報管道；畫面顯示的座號、空位、預約時間與回報紀錄都是本專案的**示範資料**，不可據此實際占位。
 
-原生 HTML / CSS / JavaScript，部署到 GitHub Pages；Supabase 提供 Auth、Postgres、RLS 與 RPC。提供北側、南側及 2 樓閱覽區的座位查詢與預約。
+以北科大圖書館B1自習室A／B／C三區為設計情境，提供模擬選位、座位登記、個人紀錄、取消、占位異常回報及原型管理員管理功能。每區僅配置**12個虛構座位**（共36席），不是校方正式座位配置。
 
-## 專案檔案
-- `index.html`：網站頁面
-- `styles.css`：夜間圖書館視覺
-- `app.js`：Supabase 前端流程
-- `app-utils.js`：CSV 輸出、安全逸出與共用轉換
-- `config.js`：只填 Supabase URL 與 Publishable key
-- `setup.sql`：資料表、RLS、預約 RPC、註冊限流
-- `setup_incremental_floor2_room.sql`：保留既有資料，增量新增 2 樓閱覽區及 10 席
-- `supabase/functions/register-student/index.ts`：學生註冊 Edge Function
+## 檔案位置
 
-## 重要設計
-- 學號映射為 `${學號}@students.library.invalid`，只供 Supabase Auth 使用，不要求真實 Email。
-- 註冊由 Edge Function 使用 service role 建立 Auth user；Auth trigger 在同一資料庫交易建立 `profiles`。trigger 或 profile 寫入失敗時 Auth 建立交易會失敗；Edge Function 另做檢查並刪除殘留 Auth user。
-- 前端只使用 Publishable key；service role 僅設於 Edge Function secrets。
-- 座位預約由 `book_seat` RPC 執行，DB unique partial index 保證同座位、同日期、同時段只能一筆有效預約。
-- 日期和時段規則在 DB 驗證：台北日期今天至第 7 天、每日 09:00–20:00 開始（每段一小時，最後一段 20:00–21:00）。
-- 學生只能讀取自己的預約；館員可讀取全部並管理座位、封鎖時段。
-- 館員管理頁可解除單筆封鎖及匯出篩選後的預約 CSV；解除封鎖由資料庫 RLS 限制為館員。
-- 註冊需 Cloudflare Turnstile token；Edge Function 再以 IP 雜湊做每小時最多 5 次限制。
+```text
+/
+├─ index.html                    網頁結構
+├─ styles.css                    介面樣式
+├─ app.js                        座位、登入、回報及管理流程
+├─ app-utils.js                  CSV安全逸出、匯出欄位與時間格式
+├─ config.js                     Supabase公開連線設定與Turnstile公開Site Key
+├─ README.md                     本說明（唯一Markdown檔）
+├─ .gitignore
+├─ supa/
+│  ├─ setup.sql                  首次建立空白資料庫使用
+│  ├─ migrations/
+│  │  └─ 20261111_ntut_b1_demo.sql   **既有資料庫**升級用
+│  └─ functions/
+│     └─ register-student/
+│        └─ index.ts             註冊Edge Function
+└─ tests/
+   └─ app-utils.test.js          CSV與時間格式單元測試
+```
 
-## A. 建立 Supabase 專案
-1. 建立 Supabase project，記下 Project URL、Publishable key。
-2. Authentication → Providers → Email：保持 Email provider 啟用。此專案以合成的 `.invalid` Email 作為登入識別，不寄送驗證信。
-3. Authentication → Settings：若有「Confirm email」設定，無需依賴它；Edge Function 建立帳號時明確設 `email_confirm: true`。
-4. SQL Editor → New query，貼上整份 `setup.sql` → Run。
-5. Table Editor 確認 `profiles` / `reservations` / `blocked_slots` 已建立。
-6. Database → Functions 確認 `book_seat`、`cancel_reservation`、`is_librarian`、`allow_registration_attempt` 存在。
-7. Authentication → Users 初始可為空；完成註冊後會看到 Auth user。
-8. 若資料庫尚未有現行北側／南側完整席位，先依需求執行 `setup_incremental_seats.sql`；再執行 `setup_incremental_floor2_room.sql`。兩份都是增量 SQL，不會重建或清空資料表。
+## Supabase：需要手動修改的位置
 
-## 新增 2 樓閱覽區
+**先備份資料庫。現有專案請勿重跑`supa/setup.sql`。**
 
-在 Supabase Dashboard → SQL Editor 執行 `setup_incremental_floor2_room.sql`。腳本只擴充 `seats`、`blocked_slots`、`reservations` 的館室代碼檢查條件，並以 `ON CONFLICT DO NOTHING` 新增 `floor2` 的 1–10 號座位；既有北側、南側座位、預約與啟用狀態會保留。可重複執行。
+1. **現有資料庫：** Supabase → SQL Editor，執行 [`supa/migrations/20261111_ntut_b1_demo.sql`](supa/migrations/20261111_ntut_b1_demo.sql)。它擴充原有資料表並建立B1示範座位與`seat_reports`，不會刪除舊資料。
+2. **全新資料庫：**先執行 [`supa/setup.sql`](supa/setup.sql)，再執行前述增量SQL。舊版初始化內容保留作為新資料庫的結構前置。
+3. **註冊Function：**Supabase → Edge Functions → `register-student`，部署 [`supa/functions/register-student/index.ts`](supa/functions/register-student/index.ts)。
+4. **人機驗證：**在Cloudflare Turnstile建立站台，取得Site Key與Secret Key；將公開Site Key填在根目錄`config.js`的`TURNSTILE_SITE_KEY`；至Supabase → Edge Functions → Secrets設定`TURNSTILE_SECRET_KEY`，建議加設`TURNSTILE_ALLOWED_HOSTNAMES`為實際站台hostname（例如`tp6xu4jo3.github.io`）。
+5. **安全提醒：**Secret Key及Service Role Key不可放在GitHub前端檔案。原型帳號使用虛構9位數測試編號，不可當作北科大校務登入。
 
-若要回復此功能，請先另行備份並評估相關預約與封鎖資料；不要直接刪除資料表或重跑初始化腳本。
+### 以Supabase CLI部署Function
 
-## B. 設定 Turnstile
-1. 到 Cloudflare Dashboard → Turnstile 建立 Widget，選 GitHub Pages 網域（測試時可加入 localhost）。
-2. 取得 Site Key 與 Secret Key。
-3. 將 Site Key 加入 `index.html` 註冊表單，並加入 Turnstile 官方 widget script，讓表單產生 `cf-turnstile-response` token。
-4. `app.js` 的 register 呼叫 body 加上 `turnstile_token: document.querySelector('[name="cf-turnstile-response"]').value`。
-5. Edge Function secret 設定 `TURNSTILE_SECRET_KEY`。不要把 Secret Key 放前端。
-6. 正式上線前，務必完成此步驟；註冊端點未設定時會回覆 503，不會開放無驗證註冊。
+Supabase CLI預設讀取**`supabase/functions/`**，而本repo依需求將後台檔案集中於**`supa/`**。使用CLI時，需在本機建立臨時預設路徑，複製Function後部署（請勿把臨時`supabase/`資料夾提交到repo）：
 
-## C. 部署 Edge Function
-安裝 Supabase CLI 並登入：
 ```bash
-npm install -g supabase
+mkdir -p supabase/functions
+cp -R supa/functions/register-student supabase/functions/
 supabase login
 supabase link --project-ref YOUR_PROJECT_REF
-supabase secrets set TURNSTILE_SECRET_KEY=YOUR_TURNSTILE_SECRET
 supabase functions deploy register-student
 ```
-Supabase 專案的 `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`SUPABASE_ANON_KEY` 由 Edge Functions 執行環境提供；若專案環境未自動提供，使用 `supabase secrets set` 設定相應值。service role key 絕不可提交 Git。
 
-前端註冊呼叫方式：
-```js
-const { data, error } = await supabase.functions.invoke("register-student", {
-  body: {
-    student_id: "001123456",
-    password: "至少八位密碼",
-    turnstile_token: document.querySelector('[name="cf-turnstile-response"]').value
-  }
-});
-```
-目前範例 `app.js` 的註冊流程已呼叫 Function；依上節將 Turnstile token 加入 body 後即可正式使用。
+可改用Supabase Dashboard的Edge Function編輯器手動更新程式，不必建立臨時目錄。必須確認執行環境可讀取`SUPABASE_URL`與`SUPABASE_SERVICE_ROLE_KEY`。
 
-## D. 設定 config.js
-```js
-window.APP_CONFIG = {
-  SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
-  SUPABASE_PUBLISHABLE_KEY: "sb_publishable_..."
-};
-```
-使用 Publishable key（舊專案 anon key 亦可），不要使用 secret/service_role key。
+### 執行後檢查
 
-## E. 建立館員
-1. 先由網站註冊一個學生帳號。
-2. SQL Editor 執行（換成自己的測試學號）：
 ```sql
-update public.profiles set role='librarian' where student_id='001123456';
+select room_code, count(*) as demo_seats
+from public.seats
+where room_code in ('b1a','b1b','b1c')
+group by room_code order by room_code;
+-- 預期：每區12個示範席位
 ```
-3. 登出再登入，導覽列會出現「館員管理」。
 
-## F. GitHub Pages
-1. 將整個資料夾內容推送至 GitHub repository 根目錄（`index.html` 必須在根目錄）。
-2. Repository → Settings → Pages → Deploy from a branch → `main` / `/ (root)` → Save。
-3. 等待 Pages 顯示網址後開啟。確認 `config.js` 與 `app.js` 同網域可載入。
+如需原型管理員，先用測試帳號註冊，再於Supabase SQL Editor將該帳號`profiles.role`設為`librarian`；不要授予不可信使用者。原型資料不是校方正式座位資訊。
 
-## G. 測試清單
-- 訪客可看到座位圖；未登入點選座位會被要求登入。
-- 用合法學號註冊；同學號再次註冊應顯示已註冊。
-- 使用相同學號與密碼登入；錯誤密碼不可登入。
-- 登入後切換日期、時段、閱覽室，確認空位即時更新。
-- 兩個瀏覽器同時預約同一座位同一時段：只能一方成功，另一方收到搶位失敗提示。
-- 我的預約只顯示自己的有效預約；取消後座位恢復空位。
-- 館員帳號能停用座位、封鎖時段並查看預約；一般學生不能。
-- 直接在前端呼叫 `book_seat` 時，超出日期或時段規則應由 DB 拒絕。
+## 檢查與測試
 
-## 注意事項 / 上線前檢查
-- 這是教案 MVP。學號是識別碼，不是可靠身分驗證；正式校務系統應串接校方 SSO。
-- SQL 中館員角色由具備 Dashboard SQL 權限的人手動提升。絕不可讓使用者自行修改 profiles.role。
-- 若要更嚴格的註冊防濫用，Turnstile 網域白名單、每 IP 限流與 Supabase Auth rate limits 都應啟用；若部署在非 Cloudflare 代理環境，`cf-connecting-ip` 可能是空值，應改用可信代理提供的 client IP header。
-- RLS 是安全邊界；不要在前端放 service role key。
+- 先完成SQL、Function及Turnstile設定，才能正常使用新分區與回報功能。
+- 同座位同時段避免重複登記，操作後可取消。
+- 一般使用者可回報座位遭占用、設備異常等狀況；僅原型管理員可檢視全部並結案。
+- `tests/app-utils.test.js`用來驗證CSV特殊字元、公式注入防護、時間格式與匯出欄位不含學號等識別資料。若已安裝Node.js，可執行`node --test tests/app-utils.test.js`。
+- `app-utils.js`被`app.js`實際引用，故保留；如果刪除，CSV匯出與部分時間顯示會失效。
+
+## 參考資料與限制
+
+- [北科大校方空間資料](https://irsdc.ntut.edu.tw/p/426-1145-10.php?Lang=zh-tw)：B1自習室有A／B／C三區，合計275席（不代表本原型的36個模擬座位）。
+- [北科大圖書館使用及借閱規則](https://library.ntut.edu.tw/p/412-1024-2675.php)：發布的規則版本可能不是現行細則，正式系統需再由館方確認。
+- 2023年北科大Dcard使用經驗談及其他學校座位管理流程僅作設計研究參考，個別貼文不能代表問題發生率。
+
+尚未完成官方SSO、真實座位配置與座號、正式登記／報到／暫離規則、官方系統API串接、實地使用測試；因此不得宣稱改善成效已獲驗證。

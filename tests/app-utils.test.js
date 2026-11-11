@@ -5,7 +5,7 @@ const { endTime, reservationCsvRows, toCsv } = require("../app-utils.js");
 test("CSV quotes Traditional Chinese, commas, quotes, and line breaks", () => {
   const csv = toCsv(
     ["館室", "原因"],
-    [["2 樓閱覽區", '桌面, "維護"\r\n今日']]
+    [["B1 自習室 C 區", '桌面, "維護"\r\n今日']]
   );
 
   assert.equal(csv, '"館室","原因"\r\n"2 樓閱覽區","桌面, ""維護""\r\n今日"');
@@ -30,7 +30,7 @@ test("reservation end time handles the last supported slot", () => {
 
 test("reservation CSV rows contain only the six requested non-identifying fields", () => {
   const rows = reservationCsvRows([{
-    room_code: "floor2",
+    room_code: "b1c",
     reservation_date: "2026-11-07",
     start_time: "20:00:00",
     status: "confirmed",
@@ -39,13 +39,13 @@ test("reservation CSV rows contain only the six requested non-identifying fields
     user_id: "private-user-id",
     email: "reader@example.invalid"
   }], {
-    floor2: "2 樓閱覽區"
+    b1c: "B1 自習室 C 區"
   }, {
     confirmed: "已確認"
   });
 
   assert.deepEqual(rows, [[
-    "2 樓閱覽區", "10", "2026-11-07", "20:00", "21:00", "已確認"
+    "B1 自習室 C 區", "10", "2026-11-07", "20:00", "21:00", "已確認"
   ]]);
   assert.equal(rows[0].length, 6);
 });
