@@ -7,7 +7,7 @@
 
   // 示範座位僅使用測試編號；不捏造館方真實座位排列與設備配置。
   let sb, session = null, profile = null, selectedSeat = null, seatView = null;
-  let currentAuth = "login", toastTimer, currentView = "booking";
+  let currentAuth = "login", toastTimer, currentView = "booking", turnstileWidgetId = null;
   let currentQueryId = 0; // 查詢防競爭識別碼
   let realtimeChannel = null, pollingTimer = null, remoteDebounceTimer = null;
   let cachedReservations = [];
@@ -337,6 +337,16 @@
     $("auth-title").textContent = mode === "login" ? "登入原型測試帳號" : "建立原型測試帳號";
     $("auth-submit").innerHTML = (mode === "login" ? "登入" : "註冊帳號") + " <span>↗</span>";
     $("password").autocomplete = mode === "login" ? "current-password" : "new-password";
+    const captcha = $("turnstile-container");
+    captcha.classList.toggle("hidden", mode !== "register");
+    if (mode === "register" && cfg.TURNSTILE_SITE_KEY && window.turnstile && turnstileWidgetId === null) {
+      try {
+        turnstileWidgetId = window.turnstile.render(captcha, { sitekey: cfg.TURNSTILE_SITE_KEY });
+      } catch (e) {
+        console.error("Turnstile render failed", e);
+        notify("人機驗證載入失敗，請重新整理網頁。");
+      }
+    }
   }
 
   function validStudent(id) {
@@ -352,7 +362,14 @@
     setBusy(btn, true);
     try {
       if (currentAuth === "register") {
-        const { data, error } = await sb.functions.invoke("account", { body: { student_id: id, password: pw } });
+        if (!cfg.TURNSTILE_SITE_KEY || !window.turnstile || turnstileWidgetId === null) {
+          throw new Error("註冊服務尚未設定人機驗證，請由管理者完成 Turnstile 設定。");
+        }
+        const token = window.turnstile.getResponse(turnstileWidgetId);
+        if (!token) throw new Error("請先完成人機驗證。");
+        const { data, error } = await sb.functions.invoke("register-student", {
+          body: { student_id: id, password: pw, turnstile_token: token }
+        });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
         const email = `${id}@students.library.invalid`;
@@ -370,6 +387,9 @@
       console.error(err);
       notify(err.message?.includes("already") ? "此測試編號已註冊，請直接登入。" : (err.message || "操作失敗，請稍後再試。"));
     } finally {
+      if (currentAuth === "register" && window.turnstile && turnstileWidgetId !== null) {
+        window.turnstile.reset(turnstileWidgetId);
+      }
       setBusy(btn, false);
     }
   }
