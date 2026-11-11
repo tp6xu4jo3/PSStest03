@@ -98,9 +98,10 @@ function createHarness() {
   new Function("window", "document", "setTimeout", "clearTimeout", main)(
     window, document, () => {}, () => {}
   );
-  const view = (room, seats, booked, alerts = []) => window.__testApp.setView({
+  const view = (room, seats, booked, alerts = [], presence = []) => window.__testApp.setView({
     room, seats, bookedSet: new Set(booked),
-    alertMap: new Map(alerts.map(a => [a.seat_id, a])), isBlocked: false
+    alertMap: new Map(alerts.map(a => [a.seat_id, a])),
+    presenceMap: new Map(presence), isBlocked: false
   });
   const button = no => get("floorplan").querySelectorAll(".seat-object")
     .find(node => Number(node.dataset.seatNo) === no);
@@ -111,7 +112,7 @@ test("clicking seats does not remount the room or restart pedestrian animation",
   const app = createHarness();
   const seats = Array.from({ length: 11 }, (_, index) =>
     ({ id: `seat-${index + 1}`, seat_no: index + 1, is_active: true }));
-  app.view("b1a", seats, ["seat-1"]);
+  app.view("b1a", seats, ["seat-1"], [], [["seat-1","present"]]);
   app.render();
   assert.equal(app.get("floorplan").mounts, 1);
   assert.equal(app.get("floorplan").querySelectorAll(".seat-object").length, 12);
@@ -144,10 +145,10 @@ test("reservation refresh updates chair colors without replacing room DOM", () =
   const app = createHarness();
   const seats = Array.from({ length: 12 }, (_, index) =>
     ({ id: `seat-${index + 1}`, seat_no: index + 1, is_active: true }));
-  app.view("b1a", seats, ["seat-1"]);
+  app.view("b1a", seats, ["seat-1"], [], [["seat-1","present"]]);
   app.render();
   const occupant = app.button(1).querySelector(".seat-model").querySelector(".desk-reader");
-  app.view("b1a", seats, ["seat-1", "seat-3"]);
+  app.view("b1a", seats, ["seat-1", "seat-3"], [], [["seat-1","present"]]);
   app.render();
   assert.equal(app.get("floorplan").mounts, 1);
   assert.equal(app.button(3).classList.contains("seat-occupied"), true);
@@ -239,4 +240,59 @@ test("shared Discipline workbench shows bag on the correct tabletop segment", ()
   assert.ok(tableCell.querySelector(".detected-object"));
   assert.equal(app.button(3).classList.contains("seat-anomaly"),true);
   assert.equal(app.get("floorplan").mounts,1);
+});
+
+
+test("camera simulation cycles pending → check-in → away → return without scene remount", () => {
+  const app = createHarness();
+  const seats = Array.from({length:12}, (_,index) =>
+    ({id:`seat-${index+1}`,seat_no:index+1,is_active:true}));
+  const withState = state => app.view("b1a",seats,["seat-2"],[],state ? [["seat-2",state]] : []);
+  const seat = () => app.button(2);
+  const model = () => seat().querySelector(".seat-model");
+
+  withState(null);
+  app.render();
+  const originalWalkerLayer = app.get("floorplan").querySelector(".iso-room").sub["room-people"];
+  assert.equal(seat().classList.contains("seat-pending"),true);
+  assert.equal(model().querySelector(".desk-reader"),null);
+
+  withState("present");
+  app.render();
+  assert.equal(seat().classList.contains("seat-present"),true);
+  const reader = model().querySelector(".desk-reader");
+  assert.ok(reader);
+
+  withState("away");
+  app.render();
+  assert.equal(seat().classList.contains("seat-away"),true);
+  assert.equal(model().querySelector(".desk-reader"),null);
+  assert.ok(model().querySelector(".away-indicator"));
+
+  withState("returned");
+  app.render();
+  assert.equal(seat().classList.contains("seat-returned"),true);
+  assert.ok(model().querySelector(".desk-reader"));
+  assert.equal(model().querySelector(".away-indicator"),null);
+
+  seat().onclick();
+  assert.equal(app.get("inspection-status").textContent,"已回座");
+  assert.ok(app.get("presence-seat-status").textContent.includes("模擬攝影機"));
+  assert.equal(app.get("floorplan").mounts,1);
+  assert.strictEqual(app.get("floorplan").querySelector(".iso-room").sub["room-people"],originalWalkerLayer);
+});
+
+test("person on an unbooked seat generates a visible person anomaly, not check-in", () => {
+  const app = createHarness();
+  const seats = Array.from({length:12},(_,index)=>
+    ({id:`seat-${index+1}`,seat_no:index+1,is_active:true}));
+  app.view("b1a",seats,[],[{id:"alert-1",seat_id:"seat-4",object_type:"person"}]);
+  app.render();
+  assert.equal(app.button(4).classList.contains("seat-anomaly"),true);
+  const figure = app.button(4).querySelector(".seat-model").querySelector(".detected-object");
+  assert.ok(figure);
+  assert.equal(figure.className,"detected-object object-person");
+  assert.equal(app.button(4).querySelector(".seat-model").querySelector(".desk-reader"),null);
+  app.button(4).onclick();
+  assert.equal(app.get("confirm-booking").disabled,true);
 });
