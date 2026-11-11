@@ -17,7 +17,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "僅接受 POST 請求。" }, 405);
 
-  let body: { student_id?: unknown; password?: unknown };
+  let body: { student_id?: unknown; password?: unknown; turnstile_token?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -26,13 +26,39 @@ Deno.serve(async (req: Request) => {
 
   const studentId = typeof body.student_id === "string" ? body.student_id.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
+  const turnstileToken = typeof body.turnstile_token === "string" ? body.turnstile_token : "";
 
-  // 學號必須為 9 位數，前三碼介於 000–115。
+  // 僅用虛構測試識別碼；不是北科大校方學號驗證。
   if (!/^(?:0[0-9]{2}|10[0-9]|11[0-5])[0-9]{6}$/.test(studentId)) {
-    return json({ error: "學號格式錯誤：需為 9 位數，前三碼須介於 000–115。" }, 400);
+    return json({ error: "測試編號格式錯誤：需為 9 位數，前三碼須介於 000–115。" }, 400);
   }
   if (password.length < 8 || password.length > 72) {
     return json({ error: "密碼長度需為 8–72 個字元。" }, 400);
+  }
+
+  // 驗證在伺服器完成，不能只信任前端 token，也不能公開 Secret Key。
+  const turnstileSecret = Deno.env.get("TURNSTILE_SECRET_KEY");
+  if (!turnstileSecret) return json({ error: "註冊防護尚未設定，暫停開放註冊。" }, 503);
+  if (!turnstileToken) return json({ error: "請先完成人機驗證。" }, 400);
+
+  try {
+    const verifyResponse = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      body: new URLSearchParams({ secret: turnstileSecret, response: turnstileToken }),
+    });
+    if (!verifyResponse.ok) throw new Error("siteverify HTTP error");
+    const verifyResult = await verifyResponse.json() as { success?: boolean; hostname?: string };
+    if (verifyResult.success !== true) return json({ error: "人機驗證未通過，請重新驗證。" }, 403);
+
+    // 建議設定 TURNSTILE_ALLOWED_HOSTNAMES（逗號分隔），限制能註冊的正式來源。
+    const allowList = (Deno.env.get("TURNSTILE_ALLOWED_HOSTNAMES") || "")
+      .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+    if (allowList.length && !allowList.includes((verifyResult.hostname || "").toLowerCase())) {
+      return json({ error: "不允許從這個網域建立測試帳號。" }, 403);
+    }
+  } catch (error) {
+    console.error("Turnstile siteverify failed:", error);
+    return json({ error: "人機驗證服務暫時無法使用。" }, 503);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
