@@ -292,3 +292,97 @@ button:active:not(:disabled){transform:translateY(2px) scale(.985)}
 @media(max-width:860px){.experience-grid{grid-template-columns:1fr}.experience-grid .summary{position:static}.room-portal{padding:24px}.prototype-notice{display:block}.prototype-notice p{margin-top:7px}.controls-compact{flex-wrap:wrap}.controls-compact .availability-note{width:100%;margin:0}.scene-viewport{height:min(76vw,590px);min-height:420px}}
 @media(max-width:600px){.room-portal{padding:20px 15px}.room-tabs{gap:6px}.room-tab{flex-direction:column;align-items:flex-start;gap:8px;padding:10px 7px}.room-tab .room-letter{font-size:22px}.room-tab strong{font-size:10px}.room-tab small{font-size:8px}.controls-compact{padding:14px}.room-map-heading h2{font-size:21px}.room-map-heading .floor-tag{display:none}.scene-viewport{min-height:400px;height:440px;overflow-x:auto;justify-content:flex-start}.scene-stage{min-width:580px;width:580px;margin:auto}.map-panel{min-width:0}.scene-note{font-size:9px;max-width:70%}.seat-object{width:61px;height:56px}.desk-equipment{font-size:8px}.seat-label{font-size:9px}.experience-grid .map-panel{padding:17px 12px 13px}.experience-grid .legend{gap:10px;font-size:9px}.portal-copy h2{font-size:35px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+
+
+.room-seat-layer{z-index:22;pointer-events:none}
+.room-seat-layer .seat-object{pointer-events:auto}
+.seat-object *, .room-base, .floor-grid, .room-wall, .room-window, .room-door{pointer-events:none}
+.room-people{z-index:25;pointer-events:none}
+.room-furniture{z-index:8;pointer-events:none}
+.seat-object{z-index:3;isolation:isolate;cursor:pointer;touch-action:manipulation}
+.seat-object:hover{z-index:31}
+.seat-object.is-selected{z-index:32}
+.seat-object.is-dimmed{opacity:.58}
+.seat-object:active:not(:disabled){transform:translate(-50%,-50%) scale(.97)}
+.seat-model{pointer-events:none}
+.iso-room{background:transparent!important;box-shadow:0 22px 48px rgba(0,0,0,.24);isolation:isolate}
+.iso-room::before{content:"";position:absolute;inset:0;z-index:-1;clip-path:var(--room-shape);border-radius:10px;background:var(--room-floor);box-shadow:inset 0 0 45px rgba(0,0,0,.2)}
+.iso-room .room-base{clip-path:var(--room-shape);border:0;border-radius:0;inset:0;box-shadow:inset 0 0 0 6px rgba(163,194,195,.52),inset 0 0 55px rgba(0,0,0,.14)}
+.iso-room .floor-grid{clip-path:var(--room-shape)}
+.iso-outline-soft-bay{--room-shape:polygon(10% 0,88% 0,100% 12%,100% 89%,90% 100%,10% 100%,0 89%,0 12%);--room-floor:linear-gradient(145deg,#3a5450,#294344 54%,#243943)}
+.iso-outline-alcove{--room-shape:polygon(0 0,92% 0,92% 19%,100% 19%,100% 83%,92% 83%,92% 100%,0 100%,0 76%,7% 76%,7% 23%,0 23%);--room-floor:linear-gradient(148deg,#414657,#2f3e50 54%,#263545)}
+.iso-outline-stepped{--room-shape:polygon(0 0,85% 0,85% 12%,100% 12%,100% 100%,10% 100%,10% 91%,0 91%);--room-floor:linear-gradient(148deg,#494d4d,#37454a 54%,#2b3b41)}
+.iso-outline-soft-bay .wall-top{left:10%;right:12%}
+.iso-outline-soft-bay .wall-bottom{left:10%;right:10%}
+.iso-outline-alcove .wall-right{right:8%;top:0;bottom:1%;border-right:2px solid #9bb9bc}
+.iso-outline-alcove .wall-left{top:23%;bottom:24%;left:6%}
+.iso-outline-stepped .wall-top{right:15%}
+.iso-outline-stepped .wall-left{bottom:10%}
+.iso-outline-stepped .wall-bottom{left:10%}
+.iso-window-top .room-window{left:21%;top:-8px;width:58%;height:17px}
+.iso-window-right .room-window{left:auto;right:3%;top:27%;width:17px;height:44%;flex-direction:column}
+.iso-window-left .room-window{right:auto;left:-8px;top:22%;width:17px;height:46%;flex-direction:column}
+.iso-window-right .room-window i,.iso-window-left .room-window i{width:100%;height:auto}
+.iso-sleepy .room-door{left:40%;bottom:-17px}
+.iso-discipline .room-door{left:9%;bottom:-14px}
+.iso-cozy .room-door{left:43%;bottom:-15px}
+.room-prop.prop-column{width:33px;height:31px;z-index:4}
+.prop-column{position:absolute;inset:0;background:linear-gradient(142deg,#aeb4b1 0%,#738d91 53%,#445e65 54%);border:2px solid #c0cbc5;border-radius:5px;box-shadow:5px 7px 0 #36474c,9px 12px 10px #081b2380}
+.room-prop.prop-workbench{width:35%;height:16%;z-index:2}
+.prop-bench-top{position:absolute;inset:5% 3% 27%;border-radius:5px;background:linear-gradient(135deg,#b2b4a6,#849496);border:3px solid #ccd0c2;box-shadow:0 7px 0 #62767a,0 12px 10px rgba(1,9,12,.4)}
+.prop-bench-support{position:absolute;left:9%;right:9%;bottom:9%;height:7px;background:#3c545a;border-radius:3px}
+.room-prop.prop-round-table{width:9%;height:13%}
+.prop-round-table i{position:absolute;inset:8%;border-radius:50%;background:linear-gradient(120deg,#d8c5a1,#a68f7d);border:3px solid #efddbd;box-shadow:0 7px 0 #806d64,0 11px 6px #0005}
+.room-prop.prop-rug{width:29%;height:25%;z-index:1}
+.prop-rug i{position:absolute;inset:0;background:radial-gradient(ellipse,#8b9c8a66,#b1bf9d0d 72%);border:2px dashed #b2c3a44d;border-radius:50%}
+.room-prop.prop-light-strip{width:58%;height:4px}
+.prop-light-strip i{position:absolute;inset:0;background:#c9c7fc;box-shadow:0 0 16px 7px #aeaff475;border-radius:40px;opacity:.5}
+.iso-cozy .lounge-model .desk-surface{border-radius:9px 9px 4px 4px}
+.iso-cozy .lounge-model .seat-chair{width:51%;left:24%;height:34%;border-radius:9px;background:#718f84}
+.iso-cozy .lounge-model .chair-back{height:50%;border-radius:13px 13px 5px 5px;background:#9cb5a5}
+.iso-cozy .seat-ottoman{position:absolute;width:18%;height:15%;bottom:3%;right:3%;border-radius:6px;background:#a7b7a9;box-shadow:0 5px 0 #516a64;transform:rotate(-12deg)}
+.seat-form-recliner{width:12%;height:14%;min-width:44px;min-height:56px}
+.pod-model{inset:0}
+.pod-shell{position:absolute;inset:5% 14% 6%;border-radius:35% 35% 24% 24% / 20% 20% 14% 14%;background:linear-gradient(115deg,#626987,#3e526b);border:3px solid #929cbb;box-shadow:4px 8px 0 #344056,6px 13px 8px #0d17216b;overflow:hidden}
+.pod-canopy{position:absolute;inset:0 0 53%;border-radius:50% 50% 20% 20%;border:4px solid #a8acd0;background:linear-gradient(180deg,#9a9fc2,#56617d);box-shadow:0 5px 6px #1c284a88}
+.pod-headrest{position:absolute;left:24%;right:24%;top:28%;height:14%;border-radius:45%;background:#d7d2df;border:2px solid #878fab}
+.pod-cushion{position:absolute;left:19%;right:19%;top:42%;height:31%;border-radius:10px;background:linear-gradient(145deg,#bebdd2,#828daa);box-shadow:inset 0 0 9px #525c7b}
+.pod-footrest{position:absolute;left:17%;right:17%;bottom:5%;height:24%;border-radius:6px 6px 21px 21px;background:#afb8cf;box-shadow:inset 0 -4px 4px #697896}
+.pod-gear{position:absolute;z-index:3;right:0;bottom:15%;font-size:8px;color:#ebdff3;display:flex;flex-direction:column}
+.seat-form-recliner .desk-reader{top:31%;left:38%;animation:recliner-rest 5s ease-in-out infinite}
+.seat-form-recliner .desk-reader .person-head{top:0}
+.seat-form-recliner .desk-reader .person-body{top:12px;height:23px;border-radius:13px 13px 7px 7px}
+.seat-form-recliner.facing-east .pod-shell{transform:rotate(-17deg)}
+.seat-form-recliner.facing-west .pod-shell{transform:rotate(17deg)}
+.seat-form-recliner.facing-east .seat-label{margin-left:-4px}
+.seat-form-recliner.facing-west .seat-label{margin-left:4px}
+.seat-form-workbench{width:9.5%;height:11%;min-width:38px;min-height:44px}
+.workbench-model .desk-surface{height:52%;border-radius:3px;box-shadow:0 6px 0 #57686b,0 9px 7px #0005}
+.workbench-model .bench-divider{position:absolute;left:47%;top:-5px;height:115%;width:5px;background:linear-gradient(90deg,#6d8284,#bfd4c8);border-radius:2px;box-shadow:2px 1px 0 #3e4e51}
+.workbench-model .seat-chair{height:27%;top:62%;width:30%;left:35%}
+.workbench-model .desk-reader{left:49%;top:40%}
+.seat-occupied{filter:drop-shadow(0 0 11px #f05555b3)}
+.seat-occupied .seat-label{background:#a82935!important;color:#fff9f7!important;border-color:#f96e73!important;box-shadow:0 0 13px #d12a447a}
+.seat-occupied .seat-point{background:#ff474f!important;box-shadow:0 0 0 4px #ff474f50,0 0 15px #ff293ab0}
+.seat-occupied .desk-surface{background:linear-gradient(145deg,#ee656a,#a72b3e)!important;border-color:#ff8c8c!important;box-shadow:0 4px 0 #842838,0 8px 0 #642532,0 12px 10px #1b0a0b9c!important}
+.seat-occupied .seat-chair{background:#953844!important;box-shadow:0 4px 0 #62242e,0 7px 7px #0005}
+.seat-occupied .chair-back{background:#e77e80!important}
+.seat-occupied .pod-shell{background:linear-gradient(120deg,#d94a5d,#742537)!important;border-color:#fb7788!important}
+.seat-occupied .pod-canopy{background:linear-gradient(#ee788d,#95374f)!important;border-color:#fa9db0!important}
+.seat-occupied .pod-cushion,.seat-occupied .pod-footrest{background:#e87589!important}
+.seat-occupied .desk-equipment{color:#fff4ed}
+.seat-occupied.is-selected{filter:drop-shadow(0 0 13px #f77c7c)}
+.seat-object:not(.is-selected):hover .seat-label{border-color:#f9dfad}
+.seat-object.is-dimmed{opacity:.62}
+@keyframes recliner-rest{0%,100%{translate:0 0}50%{translate:0 2px}}
+@keyframes walk-in-room{0%,100%{transform:translate(-50%,-50%)}50%{transform:translate(calc(-50% + var(--walk-x,0px)),calc(-50% + var(--walk-y,0px)))}}
+.room-people .visitor{animation:walk-in-room 12s ease-in-out infinite;will-change:transform}
+@media (max-width:600px){
+  .scene-stage{min-width:560px}
+  .seat-form-recliner{width:67px;height:66px}
+  .seat-form-workbench{width:46px;height:51px}
+  .room-prop.prop-column{width:27px;height:28px}
+}
+@media(prefers-reduced-motion:reduce){
+  .room-people .visitor,.seat-form-recliner .desk-reader{animation:none}
+}
