@@ -270,6 +270,7 @@
       if (document.visibilityState === "visible") {
         refreshSeats({ isBackground: true });
         if (profile?.role === "librarian") updateCameraBadge();
+        if (currentView === "mine") updateExpiredReservationActions();
       }
     }, 5000);
   }
@@ -961,7 +962,7 @@
 
     cachedReservations = data || [];
     const myPresence = new Map((presenceRows || []).map(row=>[row.reservation_id,row.presence_state]));
-    // 依規定：有效預約顯示「加入行事曆」按鈕；已取消的預約不顯示
+    const now = getTaipeiDateTime();
     const rows = cachedReservations.filter(r => r.status === "confirmed");
 
     if (!rows.length) {
@@ -975,9 +976,10 @@
       const startTimeFormatted = esc(r.start_time.slice(0, 5));
       const endHour = Number(r.start_time.slice(0, 2)) + 1;
       const endHourFormatted = String(endHour).padStart(2, "0") + ":00";
+      const phase = window.AppUtils.reservationTimeState(r.reservation_date,r.start_time,now);
 
       return `
-        <div class="reservation-row">
+        <div class="reservation-row" data-reservation-date="${esc(r.reservation_date)}" data-start-time="${esc(r.start_time)}">
           <div>
             <strong>${roomName}</strong>
             <small>閱覽室</small>
@@ -991,8 +993,10 @@
             <small class="my-presence" data-presence="${esc(myPresence.get(r.id) || "pending")}">模擬狀態：${esc(presenceNames[myPresence.get(r.id) || "pending"])}</small>
           </div>
           <div class="reservation-actions">
-            <button class="calendar-button" data-ics="${r.id}" title="下載行事曆 .ics 檔案">加入行事曆 📅</button>
-            <button class="cancel-button" data-cancel="${r.id}">取消預約</button>
+            ${phase === "future" ? `
+              <button class="calendar-button" data-ics="${r.id}" title="下載行事曆 .ics 檔案">加入行事曆 📅</button>
+              <button class="cancel-button" data-cancel="${r.id}">取消預約</button>
+            ` : `<span class="reservation-finished">${phase === "active" ? "使用時段進行中" : "時段已結束"}</span>`}
           </div>
         </div>
       `;
@@ -1001,13 +1005,29 @@
     document.querySelectorAll("[data-ics]").forEach(b => {
       b.onclick = () => {
         const target = cachedReservations.find(x => x.id === b.dataset.ics);
-        if (target) downloadIcs(target);
+        if (!target) return;
+        if (window.AppUtils.reservationTimeState(target.reservation_date,target.start_time,getTaipeiDateTime()) !== "future") {
+          updateExpiredReservationActions();
+          notify("此預約時段已開始，不能再加入行事曆。");
+          return;
+        }
+        downloadIcs(target);
       };
     });
 
     document.querySelectorAll("[data-cancel]").forEach(b => {
       b.onclick = () => cancelBooking(b.dataset.cancel);
     });
+  }
+
+  function updateExpiredReservationActions() {
+    const now = getTaipeiDateTime();
+    for (const row of document.querySelectorAll("#my-reservations .reservation-row")) {
+      const phase = window.AppUtils.reservationTimeState(row.dataset.reservationDate,row.dataset.startTime,now);
+      if (phase === "future") continue;
+      const controls = row.querySelector(".reservation-actions");
+      if (controls) controls.innerHTML = `<span class="reservation-finished">${phase === "active" ? "使用時段進行中" : "時段已結束"}</span>`;
+    }
   }
 
   // --- 生成並下載符合 RFC 5545 台北標準時間的 .ics 檔案 ---
@@ -1075,6 +1095,13 @@
   }
 
   async function cancelBooking(id) {
+    const reservation = cachedReservations.find(r=>r.id === id);
+    if (!reservation || window.AppUtils.reservationTimeState(
+      reservation.reservation_date,reservation.start_time,getTaipeiDateTime()) !== "future") {
+      updateExpiredReservationActions();
+      notify("此預約時段已開始，無法取消。");
+      return;
+    }
     if (!confirm("確定取消這筆預約？")) return;
     const { error } = await sb.rpc("cancel_reservation", { p_reservation_id: id });
     if (error) {
