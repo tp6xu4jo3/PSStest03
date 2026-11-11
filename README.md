@@ -1,3 +1,5 @@
+> **北科大 B1 改版中：** 本分支為教學研究原型，新增 A／B／C 示範座位及異常回報。**請先看 [README_NTUT.md](README_NTUT.md) 的Supabase更新步驟**；本頁以下是舊版「夜讀」說明，原設定不能視為北科大官方規則。
+
 # 夜讀・圖書館閱覽室座位預約
 
 原生 HTML / CSS / JavaScript，部署到 GitHub Pages；Supabase 提供 Auth、Postgres、RLS 與 RPC。提供北側、南側及 2 樓閱覽區的座位查詢與預約。
