@@ -613,7 +613,7 @@
     for (const walker of design.walkers) {
       const figure = document.createElement("div");
       figure.className = `visitor visitor-${walker.path}`;
-      figure.style.cssText = `left:${walker.x}%;top:${walker.y}%;animation-delay:${walker.delay}s`;
+      figure.style.cssText = `left:${walker.x}%;top:${walker.y}%;animation-delay:${walker.delay - Math.random() * 6}s`;
       figure.innerHTML = '<i class="person-head"></i><i class="person-body"></i><i class="person-shadow"></i>';
       pedestrians.appendChild(figure);
     }
