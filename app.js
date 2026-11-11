@@ -1,75 +1,11 @@
 (() => {
   const cfg = window.APP_CONFIG || {};
   const $ = (id) => document.getElementById(id);
-  const rooms = { north: "北側閱覽室", south: "南側閱覽室", floor2: "2 樓閱覽區" };
+  const rooms = { b1a: "B1 自習室 A 區", b1b: "B1 自習室 B 區", b1c: "B1 自習室 C 區" };
   const ALL_SLOTS = Array.from({ length: 12 }, (_, i) => `${String(i + 9).padStart(2, "0")}:00`);
-  const ROOM_TOTALS = { north: 24, south: 20, floor2: 10 };
+  const ROOM_TOTALS = { b1a: 12, b1b: 12, b1c: 12 }; // 僅供原型展示，不代表官方 275 席分配
 
-  // --- 座位建築分區與特色配置 ---
-  const NORTH_SEATS_CONFIG = [
-    // 景觀吧台區 (1..6)
-    { no: 1, zone: "景觀吧台區", tag: "靠窗 🪟", features: ["靠窗", "插座 ⚡", "高腳軟椅"] },
-    { no: 2, zone: "景觀吧台區", tag: "靠窗 🪟", features: ["靠窗", "插座 ⚡", "高腳軟椅"] },
-    { no: 3, zone: "景觀吧台區", tag: "靠窗 🪟", features: ["靠窗", "插座 ⚡", "高腳軟椅"] },
-    { no: 4, zone: "景觀吧台區", tag: "靠窗 🪟", features: ["靠窗", "插座 ⚡", "高腳軟椅"] },
-    { no: 5, zone: "景觀吧台區", tag: "靠窗 🪟", features: ["靠窗", "插座 ⚡", "高腳軟椅"] },
-    { no: 6, zone: "景觀吧台區", tag: "靠窗 🪟", features: ["靠窗", "插座 ⚡", "高腳軟椅"] },
-    // 專注 K 書區 (7..14)
-    { no: 7, zone: "專注 K 書區", tag: "獨立桌 🖥️", features: ["獨立隔板", "防眩檯燈 💡", "插座 ⚡"] },
-    { no: 8, zone: "專注 K 書區", tag: "獨立桌 🖥️", features: ["獨立隔板", "防眩檯燈 💡", "插座 ⚡"] },
-    { no: 9, zone: "專注 K 書區", tag: "獨立桌 🖥️", features: ["獨立隔板", "防眩檯燈 💡", "插座 ⚡"] },
-    { no: 10, zone: "專注 K 書區", tag: "獨立桌 🖥️", features: ["獨立隔板", "防眩檯燈 💡", "插座 ⚡"] },
-    { no: 11, zone: "專注 K 書區", tag: "獨立桌 🖥️", features: ["獨立隔板", "防眩檯燈 💡", "插座 ⚡"] },
-    { no: 12, zone: "專注 K 書區", tag: "獨立桌 🖥️", features: ["獨立隔板", "防眩檯燈 💡", "插座 ⚡"] },
-    { no: 13, zone: "專注 K 書區", tag: "獨立桌 🖥️", features: ["獨立隔板", "防眩檯燈 💡", "插座 ⚡"] },
-    { no: 14, zone: "專注 K 書區", tag: "獨立桌 🖥️", features: ["獨立隔板", "防眩檯燈 💡", "插座 ⚡"] },
-    // 研討閱覽長桌區 (15..20)
-    { no: 15, zone: "研討閱覽桌", tag: "大桌面 📚", features: ["實木大桌", "雙向插座 ⚡"] },
-    { no: 16, zone: "研討閱覽桌", tag: "大桌面 📚", features: ["實木大桌", "雙向插座 ⚡"] },
-    { no: 17, zone: "研討閱覽桌", tag: "大桌面 📚", features: ["實木大桌", "雙向插座 ⚡"] },
-    { no: 18, zone: "研討閱覽桌", tag: "大桌面 📚", features: ["實木大桌", "雙向插座 ⚡"] },
-    { no: 19, zone: "研討閱覽桌", tag: "大桌面 📚", features: ["實木大桌", "雙向插座 ⚡"] },
-    { no: 20, zone: "研討閱覽桌", tag: "大桌面 📚", features: ["實木大桌", "雙向插座 ⚡"] },
-    // 沉浸沙發區 (21..24)
-    { no: 21, zone: "沉浸沙發區", tag: "沙發座 🛋️", features: ["單人沙發", "閱讀立燈 💡"] },
-    { no: 22, zone: "沉浸沙發區", tag: "沙發座 🛋️", features: ["單人沙發", "閱讀立燈 💡"] },
-    { no: 23, zone: "沉浸沙發區", tag: "沙發座 🛋️", features: ["單人沙發", "側邊茶几 ☕"] },
-    { no: 24, zone: "沉浸沙發區", tag: "沙發座 🛋️", features: ["單人沙發", "側邊茶几 ☕"] }
-  ];
-
-  const SOUTH_SEATS_CONFIG = [
-    // 庭園吧台區 (1..4)
-    { no: 1, zone: "庭園吧台區", tag: "靠窗 🪟", features: ["庭園視野", "充電插座 ⚡"] },
-    { no: 2, zone: "庭園吧台區", tag: "靠窗 🪟", features: ["庭園視野", "充電插座 ⚡"] },
-    { no: 3, zone: "庭園吧台區", tag: "靠窗 🪟", features: ["庭園視野", "充電插座 ⚡"] },
-    { no: 4, zone: "庭園吧台區", tag: "靠窗 🪟", features: ["庭園視野", "充電插座 ⚡"] },
-    // 靜音 K 書艙 (5..10)
-    { no: 5, zone: "靜音 K 書艙", tag: "獨立桌 🖥️", features: ["三面隔板", "專屬檯燈 💡", "插座 ⚡"] },
-    { no: 6, zone: "靜音 K 書艙", tag: "獨立桌 🖥️", features: ["三面隔板", "專屬檯燈 💡", "插座 ⚡"] },
-    { no: 7, zone: "靜音 K 書艙", tag: "獨立桌 🖥️", features: ["三面隔板", "專屬檯燈 💡", "插座 ⚡"] },
-    { no: 8, zone: "靜音 K 書艙", tag: "獨立桌 🖥️", features: ["三面隔板", "專屬檯燈 💡", "插座 ⚡"] },
-    { no: 9, zone: "靜音 K 書艙", tag: "獨立桌 🖥️", features: ["三面隔板", "專屬檯燈 💡", "插座 ⚡"] },
-    { no: 10, zone: "靜音 K 書艙", tag: "獨立桌 🖥️", features: ["三面隔板", "專屬檯燈 💡", "插座 ⚡"] },
-    // 中央閱覽桌 (11..16)
-    { no: 11, zone: "中央閱覽桌", tag: "大桌面 📚", features: ["實木大桌", "雙向插座 ⚡"] },
-    { no: 12, zone: "中央閱覽桌", tag: "大桌面 📚", features: ["實木大桌", "雙向插座 ⚡"] },
-    { no: 13, zone: "中央閱覽桌", tag: "大桌面 📚", features: ["實木大桌", "雙向插座 ⚡"] },
-    { no: 14, zone: "中央閱覽桌", tag: "大桌面 📚", features: ["實木大桌", "雙向插座 ⚡"] },
-    { no: 15, zone: "中央閱覽桌", tag: "大桌面 📚", features: ["實木大桌", "雙向插座 ⚡"] },
-    { no: 16, zone: "中央閱覽桌", tag: "大桌面 📚", features: ["實木大桌", "雙向插座 ⚡"] },
-    // 休閒沙發區 (17..20)
-    { no: 17, zone: "休閒沙發區", tag: "沙發座 🛋️", features: ["休閒沙發", "側邊矮几 ☕"] },
-    { no: 18, zone: "休閒沙發區", tag: "沙發座 🛋️", features: ["休閒沙發", "側邊矮几 ☕"] },
-    { no: 19, zone: "休閒沙發區", tag: "沙發座 🛋️", features: ["休閒沙發", "立燈 💡"] },
-    { no: 20, zone: "休閒沙發區", tag: "沙發座 🛋️", features: ["休閒沙發", "立燈 💡"] }
-  ];
-
-  const FLOOR2_SEATS_CONFIG = Array.from({ length: 10 }, (_, index) => {
-    const no = index + 1;
-    const zone = no <= 4 ? "窗邊閱讀桌" : no <= 8 ? "中央共讀桌" : "安靜角落";
-    return { no, zone, tag: "獨立座位", features: ["桌椅", "插座 ⚡"] };
-  });
-
+  // 示範座位僅使用測試編號；不捏造館方真實座位排列與設備配置。
   let sb, session = null, profile = null, selectedSeat = null, seatView = null;
   let currentAuth = "login", toastTimer, currentView = "booking";
   let currentQueryId = 0; // 查詢防競爭識別碼
@@ -136,10 +72,7 @@
   }
 
   function getSeatConfig(room, seatNo) {
-    const list = room === "north" ? NORTH_SEATS_CONFIG
-      : room === "south" ? SOUTH_SEATS_CONFIG
-      : FLOOR2_SEATS_CONFIG;
-    return list.find(s => s.no === seatNo) || { no: seatNo, zone: "一般座位", tag: "閱覽座", features: [] };
+    return { no: seatNo, zone: rooms[room] || "B1 示範區", tag: "DEMO", features: [] };
   }
 
   // --- 初始化流程 ---
@@ -179,6 +112,8 @@
     $("bookable-only").onchange = renderMap;
     $("clear-filter").onclick = clearFilter;
     $("confirm-booking").addEventListener("click", book);
+    $("issue-form").addEventListener("submit", submitIssueReport);
+    $("reports-refresh").addEventListener("click", loadIssueReports);
     $("auth-open").onclick = () => openAuth();
     $("auth-close").onclick = () => $("auth-modal").classList.add("hidden");
     $("logout").onclick = logout;
@@ -222,15 +157,15 @@
   }
 
   function updateRoomFoot() {
-    const room = $("room-select") ? $("room-select").value : "north";
-    const total = ROOM_TOTALS[room] || 24;
+    const room = $("room-select") ? $("room-select").value : "b1a";
+    const total = ROOM_TOTALS[room] || 12;
     const el = $("room-total-seats");
     if (el) el.textContent = total;
   }
 
   function updateAdminSeatOptions() {
     const room = $("admin-room").value;
-    const count = ROOM_TOTALS[room] || 24;
+    const count = ROOM_TOTALS[room] || 12;
     $("admin-seat").innerHTML = Array.from({ length: count }, (_, i) =>
       `<option value="${i + 1}">座位 ${String(i + 1).padStart(2, "0")}</option>`
     ).join("");
@@ -278,8 +213,8 @@
     const room = $("room-select").value;
     const date = $("date-select").value;
 
-    $("availability-count").textContent = "正在搜尋最早可預約時段…";
-    $("floorplan").innerHTML = '<div class="loading">正在搜尋最早可預約時段…</div>';
+    $("availability-count").textContent = "正在搜尋示範時段…";
+    $("floorplan").innerHTML = '<div class="loading">正在讀取示範時段…</div>';
     showEmpty("");
     $("confirm-booking").disabled = true;
 
@@ -346,7 +281,7 @@
     if (queryId !== currentQueryId) return null;
     if (seatError) throw seatError;
     const totalActive = (activeSeats || []).length;
-    if (!totalActive) return null;
+    if (!totalActive) throw new Error("B1_DEMO_SQL_MISSING");
 
     // 依序檢查最早有空位的時段
     for (const slot of candidateSlots) {
@@ -385,7 +320,7 @@
   }
 
   function updateAccount() {
-    $("user-label").textContent = profile ? `${profile.student_id} · ${profile.role === "librarian" ? "館員" : "學生"}` : "訪客模式";
+    $("user-label").textContent = profile ? `${profile.student_id} · ${profile.role === "librarian" ? "原型管理員" : "測試使用者"}` : "訪客模式";
     $("auth-open").classList.toggle("hidden", !!session);
     $("logout").classList.toggle("hidden", !session);
     document.querySelectorAll(".admin-only").forEach(x => x.classList.toggle("hidden", profile?.role !== "librarian"));
@@ -399,7 +334,7 @@
   function switchAuth(mode) {
     currentAuth = mode;
     document.querySelectorAll("[data-auth]").forEach(b => b.classList.toggle("active", b.dataset.auth === mode));
-    $("auth-title").textContent = mode === "login" ? "歡迎回到夜讀" : "建立你的夜讀帳號";
+    $("auth-title").textContent = mode === "login" ? "登入原型測試帳號" : "建立原型測試帳號";
     $("auth-submit").innerHTML = (mode === "login" ? "登入" : "註冊帳號") + " <span>↗</span>";
     $("password").autocomplete = mode === "login" ? "current-password" : "new-password";
   }
@@ -411,7 +346,7 @@
   async function authenticate(e) {
     e.preventDefault();
     const id = $("student-id").value.trim(), pw = $("password").value;
-    if (!validStudent(id)) { notify("學號需為 9 位數，前三碼須介於 000–115。"); return; }
+    if (!validStudent(id)) { notify("請輸入 9 位數虛構測試編號（前三碼 000–115）。"); return; }
     if (pw.length < 8) { notify("密碼至少需要 8 個字元。"); return; }
     const btn = $("auth-submit");
     setBusy(btn, true);
@@ -423,7 +358,7 @@
         const email = `${id}@students.library.invalid`;
         const { error: loginError } = await sb.auth.signInWithPassword({ email, password: pw });
         if (loginError) throw loginError;
-        notify("帳號建立成功，歡迎加入夜讀。");
+        notify("測試帳號建立成功。");
         $("auth-modal").classList.add("hidden");
       } else {
         const { error } = await sb.auth.signInWithPassword({ email: `${id}@students.library.invalid`, password: pw });
@@ -433,7 +368,7 @@
       }
     } catch (err) {
       console.error(err);
-      notify(err.message?.includes("already") ? "此學號已註冊，請直接登入。" : (err.message || "操作失敗，請稍後再試。"));
+      notify(err.message?.includes("already") ? "此測試編號已註冊，請直接登入。" : (err.message || "操作失敗，請稍後再試。"));
     } finally {
       setBusy(btn, false);
     }
@@ -557,49 +492,49 @@
     $("empty-message").textContent = message;
   }
 
-  // --- 建築平面圖渲染 ---
+  // 原型示意配置：不宣稱是真實館內平面圖或實際座號。
   function renderMap() {
     const map = $("floorplan");
     if (!seatView) { showEmpty(""); return; }
-
     const { room, seats, bookedSet, isBlocked } = seatView;
-    const totalDesignSeats = ROOM_TOTALS[room] || 24;
-    const bookableCount = bookableSeats().length;
-    const bookableOnly = $("bookable-only").checked;
-
+    const total = seats.length;
+    const available = bookableSeats().length;
     $("availability-count").textContent = isBlocked
-      ? "此時段已封鎖"
-      : `目前可預約 ${bookableCount} / ${totalDesignSeats} 席`;
-
+      ? "此模擬時段已封鎖"
+      : `示範可選 ${available} / ${total} 席（非即時館方資訊）`;
     map.innerHTML = "";
-
-    // 建立建築平面圖容器
-    const plan = document.createElement("div");
-    plan.className = `arch-plan arch-${room}`;
-
-    // 頂部大片落地窗牆
-    const windowWall = document.createElement("div");
-    windowWall.className = "arch-wall-top";
-    windowWall.innerHTML = `
-      <div class="arch-window-label">
-        <span class="window-glass-bar"></span>
-        <span>${room === "north" ? "北向大片景觀採光窗 · NATURAL LIGHT & MOUNTAIN VIEW" : room === "south" ? "南向庭園綠意採光窗 · BOTANICAL GARDEN VIEW" : "二樓採光閱讀區 · LEVEL 2 READING AREA"}</span>
-        <span class="window-glass-bar"></span>
-      </div>
-    `;
-    plan.appendChild(windowWall);
-
-    if (room === "north") {
-      renderNorthPlan(plan, seats, bookedSet, isBlocked, bookableOnly);
-    } else if (room === "south") {
-      renderSouthPlan(plan, seats, bookedSet, isBlocked, bookableOnly);
-    } else {
-      renderFloor2Plan(plan, seats, bookedSet, isBlocked, bookableOnly);
+    if (!total) {
+      showEmpty("本區尚未建立示範座位。請管理者先執行 Supabase 增量 SQL。");
+      syncIssueSeatOptions();
+      return;
     }
+    const wrapper = document.createElement("div");
+    wrapper.className = "ntut-demo-map";
+    const title = document.createElement("div");
+    title.className = "ntut-map-caption";
+    title.innerHTML = `<strong>${esc(rooms[room] || "B1 示範區")}</strong><span>示意排列 · 非官方平面圖</span>`;
+    wrapper.appendChild(title);
+    const grid = document.createElement("div");
+    grid.className = "ntut-seat-grid";
+    for (const seat of seats) {
+      grid.appendChild(createSeatButton(seat.seat_no, room, seats, bookedSet, isBlocked, $("bookable-only").checked));
+    }
+    wrapper.appendChild(grid);
+    map.appendChild(wrapper);
+    syncIssueSeatOptions();
+    showEmpty(available ? "" : isBlocked
+      ? "此模擬時段已封鎖。"
+      : "這個模擬時段目前沒有可登記座位，請選擇其他時段。");
+  }
 
-    map.appendChild(plan);
-
-    showEmpty(bookableCount ? "" : isBlocked ? "此時段已被館員封鎖，請換個時段。" : "此時段已無可預約座位，請換個時段看看。");
+  function syncIssueSeatOptions() {
+    const select = $("issue-seat");
+    if (!select) return;
+    const previous = select.value;
+    const availableSeats = seatView?.seats || [];
+    select.innerHTML = '<option value="">請選擇示範座位</option>'
+      + availableSeats.map(s => `<option value="${esc(s.id)}">座位 ${String(s.seat_no).padStart(2, "0")}</option>`).join("");
+    if (availableSeats.some(s => s.id === previous)) select.value = previous;
   }
 
   function createSeatButton(no, room, dbSeats, bookedSet, isBlocked, bookableOnly) {
@@ -662,274 +597,6 @@
     return btn;
   }
 
-  // --- 北側閱覽室建築配置 (24 席) ---
-  function renderNorthPlan(plan, dbSeats, bookedSet, isBlocked, bookableOnly) {
-    // Zone A: 景觀吧台區 (1..6)
-    const zoneBar = document.createElement("div");
-    zoneBar.className = "arch-zone zone-bar";
-    zoneBar.innerHTML = `
-      <div class="zone-title">
-        <span class="zone-badge">ZONE A</span>
-        <strong>景觀吧台區</strong>
-        <small>高腳椅 · 面窗視野 · 桌面獨立插座</small>
-      </div>
-    `;
-    const barDesk = document.createElement("div");
-    barDesk.className = "bar-counter-desk";
-    for (let i = 1; i <= 6; i++) {
-      barDesk.appendChild(createSeatButton(i, "north", dbSeats, bookedSet, isBlocked, bookableOnly));
-    }
-    zoneBar.appendChild(barDesk);
-    plan.appendChild(zoneBar);
-
-    // 中段左右配置：專注 K 書區 (左) + 中央走道 + 研討閱覽長桌區 (右)
-    const midGrid = document.createElement("div");
-    midGrid.className = "arch-middle-grid";
-
-    // Zone B: 專注 K 書區 (7..14)
-    const zoneCubicle = document.createElement("div");
-    zoneCubicle.className = "arch-zone zone-cubicle";
-    zoneCubicle.innerHTML = `
-      <div class="zone-title">
-        <span class="zone-badge">ZONE B</span>
-        <strong>專注 K 書區</strong>
-        <small>獨立隔板 · 防眩檯燈 · 雙孔插座</small>
-      </div>
-    `;
-    const cubicleGrid = document.createElement("div");
-    cubicleGrid.className = "cubicle-grid";
-    for (let i = 7; i <= 14; i++) {
-      cubicleGrid.appendChild(createSeatButton(i, "north", dbSeats, bookedSet, isBlocked, bookableOnly));
-    }
-    zoneCubicle.appendChild(cubicleGrid);
-    midGrid.appendChild(zoneCubicle);
-
-    // 中央主走道
-    const aisle = document.createElement("div");
-    aisle.className = "arch-aisle";
-    aisle.innerHTML = '<span class="aisle-line"></span><span class="aisle-text">主走道 · SILENT AISLE</span><span class="aisle-line"></span>';
-    midGrid.appendChild(aisle);
-
-    // Zone C: 研討閱覽長桌區 (15..20)
-    const zoneTable = document.createElement("div");
-    zoneTable.className = "arch-zone zone-table";
-    zoneTable.innerHTML = `
-      <div class="zone-title">
-        <span class="zone-badge">ZONE C</span>
-        <strong>研討閱覽長桌區</strong>
-        <small>實木桌面 · 雙向內嵌電源</small>
-      </div>
-    `;
-    const tableGrid = document.createElement("div");
-    tableGrid.className = "table-grid";
-    for (let i = 15; i <= 20; i++) {
-      tableGrid.appendChild(createSeatButton(i, "north", dbSeats, bookedSet, isBlocked, bookableOnly));
-    }
-    zoneTable.appendChild(tableGrid);
-    midGrid.appendChild(zoneTable);
-
-    plan.appendChild(midGrid);
-
-    // 下段配置：沉浸沙發區 (21..24) + 北側入口
-    const botGrid = document.createElement("div");
-    botGrid.className = "arch-bottom-grid";
-
-    // Zone D: 沉浸沙發區 (21..24)
-    const zoneSofa = document.createElement("div");
-    zoneSofa.className = "arch-zone zone-sofa";
-    zoneSofa.innerHTML = `
-      <div class="zone-title">
-        <span class="zone-badge">ZONE D</span>
-        <strong>沉浸沙發閱讀區</strong>
-        <small>舒適單人沙發 · 閱讀立燈 · 茶几</small>
-      </div>
-    `;
-    const sofaCluster = document.createElement("div");
-    sofaCluster.className = "sofa-cluster";
-    for (let i = 21; i <= 24; i++) {
-      sofaCluster.appendChild(createSeatButton(i, "north", dbSeats, bookedSet, isBlocked, bookableOnly));
-    }
-    zoneSofa.appendChild(sofaCluster);
-    botGrid.appendChild(zoneSofa);
-
-    // 入口
-    const entranceBlock = document.createElement("div");
-    entranceBlock.className = "arch-entrance-block";
-    entranceBlock.innerHTML = `
-      <div class="arch-entrance">
-        <span class="entrance-icon">🚪</span>
-        <div class="entrance-info">
-          <strong>北側閱覽室主入口 · ENTRANCE</strong>
-          <small>請放輕腳步入座 · 全館保持安靜</small>
-        </div>
-        <span class="entrance-arrow">➔</span>
-      </div>
-    `;
-    botGrid.appendChild(entranceBlock);
-
-    plan.appendChild(botGrid);
-  }
-
-  // --- 南側閱覽室建築配置 (20 席) ---
-  function renderSouthPlan(plan, dbSeats, bookedSet, isBlocked, bookableOnly) {
-    // Zone A: 庭園吧台區 (1..4)
-    const zoneBar = document.createElement("div");
-    zoneBar.className = "arch-zone zone-bar";
-    zoneBar.innerHTML = `
-      <div class="zone-title">
-        <span class="zone-badge">ZONE A</span>
-        <strong>庭園景觀吧台區</strong>
-        <small>景觀綠意視野 · 筆電充電座</small>
-      </div>
-    `;
-    const barDesk = document.createElement("div");
-    barDesk.className = "bar-counter-desk bar-4";
-    for (let i = 1; i <= 4; i++) {
-      barDesk.appendChild(createSeatButton(i, "south", dbSeats, bookedSet, isBlocked, bookableOnly));
-    }
-    zoneBar.appendChild(barDesk);
-    plan.appendChild(zoneBar);
-
-    // 中段配置：靜音 K 書艙 (左) + 走道 + 中央閱覽桌 (右)
-    const midGrid = document.createElement("div");
-    midGrid.className = "arch-middle-grid south-middle";
-
-    // Zone B: 靜音 K 書艙 (5..10)
-    const zoneCubicle = document.createElement("div");
-    zoneCubicle.className = "arch-zone zone-cubicle";
-    zoneCubicle.innerHTML = `
-      <div class="zone-title">
-        <span class="zone-badge">ZONE B</span>
-        <strong>靜音 K 書艙</strong>
-        <small>三面隔板 · 專屬檯燈 · 插座</small>
-      </div>
-    `;
-    const cubicleGrid = document.createElement("div");
-    cubicleGrid.className = "cubicle-grid cubicle-6";
-    for (let i = 5; i <= 10; i++) {
-      cubicleGrid.appendChild(createSeatButton(i, "south", dbSeats, bookedSet, isBlocked, bookableOnly));
-    }
-    zoneCubicle.appendChild(cubicleGrid);
-    midGrid.appendChild(zoneCubicle);
-
-    // 走道
-    const aisle = document.createElement("div");
-    aisle.className = "arch-aisle";
-    aisle.innerHTML = '<span class="aisle-line"></span><span class="aisle-text">中庭步道 · WALKWAY</span><span class="aisle-line"></span>';
-    midGrid.appendChild(aisle);
-
-    // Zone C: 中央實木閱覽桌 (11..16)
-    const zoneTable = document.createElement("div");
-    zoneTable.className = "arch-zone zone-table";
-    zoneTable.innerHTML = `
-      <div class="zone-title">
-        <span class="zone-badge">ZONE C</span>
-        <strong>中央實木閱覽桌</strong>
-        <small>寬敞木桌 · 雙向內嵌電源</small>
-      </div>
-    `;
-    const tableGrid = document.createElement("div");
-    tableGrid.className = "table-grid";
-    for (let i = 11; i <= 16; i++) {
-      tableGrid.appendChild(createSeatButton(i, "south", dbSeats, bookedSet, isBlocked, bookableOnly));
-    }
-    zoneTable.appendChild(tableGrid);
-    midGrid.appendChild(zoneTable);
-
-    plan.appendChild(midGrid);
-
-    // 下段配置：休閒沙發區 (17..20) + 南側入口
-    const botGrid = document.createElement("div");
-    botGrid.className = "arch-bottom-grid";
-
-    // Zone D: 休閒沙發區 (17..20)
-    const zoneSofa = document.createElement("div");
-    zoneSofa.className = "arch-zone zone-sofa";
-    zoneSofa.innerHTML = `
-      <div class="zone-title">
-        <span class="zone-badge">ZONE D</span>
-        <strong>休閒閱讀沙發區</strong>
-        <small>單人休閒沙發 · 側邊矮几</small>
-      </div>
-    `;
-    const sofaCluster = document.createElement("div");
-    sofaCluster.className = "sofa-cluster";
-    for (let i = 17; i <= 20; i++) {
-      sofaCluster.appendChild(createSeatButton(i, "south", dbSeats, bookedSet, isBlocked, bookableOnly));
-    }
-    zoneSofa.appendChild(sofaCluster);
-    botGrid.appendChild(zoneSofa);
-
-    // 入口
-    const entranceBlock = document.createElement("div");
-    entranceBlock.className = "arch-entrance-block";
-    entranceBlock.innerHTML = `
-      <div class="arch-entrance">
-        <span class="entrance-icon">🚪</span>
-        <div class="entrance-info">
-          <strong>南側閱覽室入口 · SOUTH ENTRANCE</strong>
-          <small>請放輕腳步入座</small>
-        </div>
-        <span class="entrance-arrow">➔</span>
-      </div>
-    `;
-    botGrid.appendChild(entranceBlock);
-
-    plan.appendChild(botGrid);
-  }
-
-  function renderFloor2Plan(plan, dbSeats, bookedSet, isBlocked, bookableOnly) {
-    const body = document.createElement("div");
-    body.className = "floor2-body";
-
-    const windowTables = document.createElement("section");
-    windowTables.className = "arch-zone floor2-table-group";
-    windowTables.innerHTML = `
-      <div class="zone-title"><span class="zone-badge">ZONE A</span><strong>窗邊長桌</strong><small>採光閱讀 · 4 席</small></div>
-      <div class="floor2-seat-grid floor2-four"></div>
-    `;
-    const windowGrid = windowTables.querySelector(".floor2-seat-grid");
-    for (let no = 1; no <= 4; no++) {
-      windowGrid.appendChild(createSeatButton(no, "floor2", dbSeats, bookedSet, isBlocked, bookableOnly));
-    }
-    body.appendChild(windowTables);
-
-    const aisle = document.createElement("div");
-    aisle.className = "arch-aisle floor2-walkway";
-    aisle.innerHTML = '<span class="aisle-line"></span><span class="aisle-text">中央走道 · WALKWAY</span><span class="aisle-line"></span>';
-    body.appendChild(aisle);
-
-    const centralTables = document.createElement("div");
-    centralTables.className = "floor2-central-tables";
-    [
-      { title: "中央共讀桌 A", start: 5, end: 7 },
-      { title: "中央共讀桌 B", start: 8, end: 10 }
-    ].forEach((table, index) => {
-      const group = document.createElement("section");
-      group.className = "arch-zone floor2-table-group";
-      group.innerHTML = `
-        <div class="zone-title"><span class="zone-badge">ZONE ${index === 0 ? "B" : "C"}</span><strong>${table.title}</strong><small>桌椅 · 插座 · ${table.end - table.start + 1} 席</small></div>
-        <div class="floor2-seat-grid"></div>
-      `;
-      const grid = group.querySelector(".floor2-seat-grid");
-      for (let no = table.start; no <= table.end; no++) {
-        grid.appendChild(createSeatButton(no, "floor2", dbSeats, bookedSet, isBlocked, bookableOnly));
-      }
-      centralTables.appendChild(group);
-    });
-    body.appendChild(centralTables);
-    plan.appendChild(body);
-
-    const entrance = document.createElement("div");
-    entrance.className = "arch-entrance";
-    entrance.innerHTML = `
-      <span class="entrance-icon">🚪</span>
-      <div class="entrance-info"><strong>2 樓閱覽區入口 · ENTRANCE</strong><small>由樓梯與電梯進入，請保持走道暢通</small></div>
-      <span class="entrance-arrow">➔</span>
-    `;
-    plan.appendChild(entrance);
-  }
-
   // --- 預約摘要面板更新 ---
   function updateSummary() {
     const room = $("room-select").value;
@@ -938,9 +605,9 @@
     const seat = seatView && selectedSeat ? seatView.seats.find(s => s.id === selectedSeat) : null;
     const cfg = seat ? getSeatConfig(room, seat.seat_no) : null;
 
-    let hint = "選擇地圖上的空位，確認後完成預約。";
-    if (!session) hint = "登入後即可選位並完成預約。";
-    else if (seat) hint = "確認資料無誤後送出預約。";
+    let hint = "選擇示範空位，進行模擬登記。";
+    if (!session) hint = "登入測試帳號後才能模擬登記。";
+    else if (seat) hint = "確認示範資料無誤後送出模擬登記。";
     else if (seatView && !bookableSeats().length) hint = "此時段已無可預約座位，請換個時段。";
 
     $("sum-seat").textContent = seat ? `座位 ${String(seat.seat_no).padStart(2, "0")}` : "尚未選位";
@@ -978,7 +645,7 @@
       });
       if (error) throw error;
       selectedSeat = null;
-      notify("預約成功！已加入我的預約。");
+      notify("模擬登記完成，已加入我的登記；不代表校方座位。");
       await refreshSeats();
     } catch (e) {
       console.error(e);
@@ -994,7 +661,7 @@
         : "預約失敗，請重新載入座位並再試一次。");
       await refreshSeats();
     } finally {
-      setBusy(btn, false, "確認預約 ↗");
+      setBusy(btn, false, "確認模擬登記 ↗");
     }
   }
 
@@ -1144,7 +811,7 @@
   // --- 館員管理 ---
   async function loadAdmin() {
     if (profile?.role !== "librarian") return;
-    await Promise.all([loadAdminReservations(), loadBlockedSlots()]);
+    await Promise.all([loadAdminReservations(), loadBlockedSlots(), loadIssueReports()]);
   }
 
   function getAdminFilters() {
@@ -1356,6 +1023,87 @@
     notify("時段已封鎖。");
     refreshSeats();
     loadAdmin();
+  }
+
+  // --- 模擬座位異常回報：RLS 將權限限制為提交者與原型管理員 ---
+  async function submitIssueReport(event) {
+    event.preventDefault();
+    if (!session) {
+      openAuth();
+      notify("請先登入測試帳號，再送出模擬回報。");
+      return;
+    }
+    const seatId = $("issue-seat").value;
+    const seat = seatView?.seats.find(item => item.id === seatId);
+    if (!seat) { notify("請先從當前分區選擇一個示範座位。"); return; }
+    const btn = $("issue-submit");
+    setBusy(btn, true);
+    try {
+      const { error } = await sb.from("seat_reports").insert({
+        seat_id: seat.id,
+        room_code: $("room-select").value,
+        reported_by: session.user.id,
+        issue_type: $("issue-type").value,
+        details: $("issue-details").value.trim().slice(0, 300)
+      });
+      if (error) throw error;
+      $("issue-details").value = "";
+      notify("模擬回報已記錄；不會送至北科大圖書館。");
+    } catch (err) {
+      console.error(err);
+      notify(err.code === "23505" ? "相同問題尚未結案，無須重複回報。"
+        : "回報失敗，請先執行新版 Supabase SQL 並確認登入權限。");
+    } finally {
+      setBusy(btn, false, "送出模擬回報");
+    }
+  }
+
+  const reportTypeNames = {
+    occupied: "座位遭占用", equipment: "設備異常",
+    mismatch: "資料與現場不一致", other: "其他"
+  };
+  async function loadIssueReports() {
+    if (profile?.role !== "librarian") return;
+    const target = $("seat-issue-reports");
+    if (!target) return;
+    target.textContent = "載入中…";
+    const { data, error } = await sb.from("seat_reports")
+      .select("id,room_code,seat_id,issue_type,details,status,created_at,seats(seat_no)")
+      .order("created_at", { ascending: false }).limit(200);
+    if (error) {
+      console.error(error);
+      target.textContent = "無法讀取回報，請確認 SQL 已執行且帳號具原型管理權限。";
+      return;
+    }
+    if (!data?.length) {
+      target.innerHTML = '<div class="empty">尚無模擬回報。</div>';
+      return;
+    }
+    target.innerHTML = `<table>
+      <thead><tr><th>時間</th><th>區域</th><th>示範座位</th><th>類型</th><th>內容</th><th>狀態</th><th>操作</th></tr></thead>
+      <tbody>${data.map(r => `<tr>
+        <td>${esc(new Date(r.created_at).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}))}</td>
+        <td>${esc(rooms[r.room_code] || r.room_code)}</td>
+        <td>${esc(r.seats?.seat_no ?? "—")}</td>
+        <td>${esc(reportTypeNames[r.issue_type] || r.issue_type)}</td>
+        <td class="report-details">${esc(r.details || "—")}</td>
+        <td>${r.status === "open" ? "待處理" : "已結案"}</td>
+        <td>${r.status === "open" ? `<button class="unblock-button" type="button" data-resolve-report="${esc(r.id)}">結案</button>` : "—"}</td>
+      </tr>`).join("")}</tbody></table>`;
+    target.querySelectorAll("[data-resolve-report]").forEach(button => {
+      button.onclick = () => resolveIssueReport(button.dataset.resolveReport);
+    });
+  }
+
+  async function resolveIssueReport(id) {
+    if (profile?.role !== "librarian") return;
+    if (!confirm("將此測試回報標記為已結案？")) return;
+    const { error } = await sb.from("seat_reports").update({
+      status: "resolved", resolved_at: new Date().toISOString()
+    }).eq("id", id);
+    if (error) { notify("結案失敗，請確認原型管理權限。"); return; }
+    notify("已標記結案。");
+    loadIssueReports();
   }
 
   document.addEventListener("DOMContentLoaded", init);
