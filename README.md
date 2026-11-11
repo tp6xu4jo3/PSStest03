@@ -33,7 +33,9 @@
 │  │  ├─ 20261111_ntut_b1_demo.sql            基礎A/B/C座位與回報
 │  │  └─ 20261111_private_rooms_expansion.sql 擴充B16、C20席
 │  └─ functions/account/index.ts              現有註冊Function
-└─ tests/app-utils.test.js
+└─ tests/
+   ├─ app-utils.test.js
+   └─ room-data.test.js
 ```
 
 ## Supabase需要手動更新
@@ -63,7 +65,7 @@ group by room_code order by room_code;
 - GitHub Pages靜態前端：原生HTML/CSS/JavaScript。
 - Supabase：Auth、Postgres、RLS、RPC、Edge Function。
 - `room-data.js`純前端座位與設備配置；資料庫`seats`持有真正供原型使用的seat ID、啟用狀態，`reservations`記錄登記。無即時實體占用感測器。
-- `app-utils.js`提供CSV處理、防試算表公式注入；保留`tests/app-utils.test.js`。可用Node.js執行`node --test tests/*.test.js`。
+- `app-utils.js`提供CSV處理、防試算表公式注入；保留`tests/app-utils.test.js`，並新增`tests/room-data.test.js`驗證房間座位配置。可用Node.js執行`node --test tests/*.test.js`。
 - 不能把Supabase Service Role Key放進前端；`config.js`只能存公開連線資訊。
 - 靜態場景切換採CSS動畫；在`prefers-reduced-motion`條件下關閉動態。
 
