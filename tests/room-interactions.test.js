@@ -38,6 +38,14 @@ class Element {
     if (this.tag === "button" && html.includes("seat-model")) {
       this.sub["seat-model"] = new Element("span");
     }
+    if (html.includes('data-bench-seat="')) {
+      for (const match of html.matchAll(/data-bench-seat="(\\d+)"/g)) {
+        const place = new Element("span");
+        place.className = "bench-place";
+        place.dataset.benchSeat = match[1];
+        this.children.push(place);
+      }
+    }
   }
   get innerHTML() { return this.html || ""; }
   querySelector(selector) {
@@ -49,8 +57,12 @@ class Element {
       ? this.children.find(child => child.className === "desk-reader") || null : null);
   }
   querySelectorAll(selector) {
-    return selector === ".seat-object"
-      ? this.querySelector(".iso-room")?.sub["room-seat-layer"]?.children || [] : [];
+    const room = this.querySelector(".iso-room");
+    if (selector === ".seat-object") return room?.sub["room-seat-layer"]?.children || [];
+    if (selector === ".bench-place") {
+      return room?.sub["room-furniture"]?.children.flatMap(item => item.children.filter(child => child.className === "bench-place")) || [];
+    }
+    return [];
   }
   appendChild(child) { this.children.push(child); return child; }
   replaceChildren(...children) { this.children = children; this.mounts = (this.mounts || 0) + 1; }
@@ -151,4 +163,28 @@ test("switching the actual room builds a new map exactly once", () => {
   app.render();
   assert.equal(app.get("floorplan").mounts, 2);
   assert.equal(app.get("floorplan").querySelectorAll(".seat-object").length, 16);
+});
+
+
+test("Discipline shared tables retain their five seat markings and update reserved segments", () => {
+  const app = createHarness();
+  const seats = Array.from({ length: 20 }, (_, index) =>
+    ({ id: `seat-${index + 1}`, seat_no: index + 1, is_active: true }));
+  app.get("room-select").value = "b1c";
+  app.view("b1c", seats, ["seat-1", "seat-8"]);
+  app.render();
+  assert.equal(app.get("floorplan").querySelectorAll(".seat-object").length, 20);
+  const marks = app.get("floorplan").querySelectorAll(".bench-place");
+  assert.equal(marks.length, 20);
+  const mark = no => marks.find(place => Number(place.dataset.benchSeat) === no);
+  assert.equal(mark(1).classList.contains("is-booked"), true);
+  assert.equal(mark(2).classList.contains("is-booked"), false);
+  const originalTable = app.get("floorplan").querySelector(".iso-room").sub["room-furniture"];
+  app.button(3).onclick();
+  assert.equal(mark(3).classList.contains("is-selected"), true);
+  app.view("b1c", seats, ["seat-1", "seat-3", "seat-8"]);
+  app.render();
+  assert.equal(app.get("floorplan").mounts, 1);
+  assert.strictEqual(app.get("floorplan").querySelector(".iso-room").sub["room-furniture"], originalTable);
+  assert.equal(mark(3).classList.contains("is-booked"), true);
 });
