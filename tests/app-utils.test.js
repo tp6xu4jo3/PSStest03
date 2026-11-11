@@ -8,7 +8,7 @@ test("CSV quotes Traditional Chinese, commas, quotes, and line breaks", () => {
     [["B1 自習室 C 區", '桌面, "維護"\r\n今日']]
   );
 
-  assert.equal(csv, '"館室","原因"\r\n"2 樓閱覽區","桌面, ""維護""\r\n今日"');
+  assert.equal(csv, '"館室","原因"\r\n"B1 自習室 C 區","桌面, ""維護""\r\n今日"');
 });
 
 test("CSV neutralizes spreadsheet formulas after leading whitespace", () => {
